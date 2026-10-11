@@ -37,6 +37,7 @@ namespace BlockBlast
         private Label lblTutorialGuide;
         private int sessionGameInitialHighScore = 0;
         private bool isGameOver = false;
+        private bool isGameInProgress = false; // Cờ theo dõi trạng thái đang chơi dở hay không
 
         public fGamePlay()
         {
@@ -65,7 +66,8 @@ namespace BlockBlast
             if (btnReplay != null && btnReplay.Parent != pnlBoard) pnlBoard.Controls.Add(btnReplay);
             if (btnReplay != null) btnReplay.Visible = false;
             if (pnlGameOver != null) pnlGameOver.Visible = false;
-            if (pnlPause != null) pnlPause.Visible = false; // Mặc định ẩn menu tạm dừng khi khởi động
+            if (pnlPause != null) pnlPause.Visible = false;
+            if (pnlAbout != null) pnlAbout.Visible = false;
 
             InitTutorialLabel();
             LayoutGameControls();
@@ -76,7 +78,8 @@ namespace BlockBlast
             ApplyModernTheme();
             UpdateScoreLabels();
 
-            LoadGameSessionOrTutorial();
+            // Hiển thị Menu chính ngay khi mở ứng dụng
+            ShowMainMenu();
         }
 
         private void InitTutorialLabel()
@@ -105,7 +108,7 @@ namespace BlockBlast
             pnlDockPiece2.MouseUp += fGamePlay_MouseUp;
             pnlDockPiece3.MouseUp += fGamePlay_MouseUp;
 
-            // Nút âm thanh trong menu
+            // Nút âm thanh trong menu tạm dừng
             if (btnSound != null)
             {
                 btnSound.Click += (s, ev) =>
@@ -116,18 +119,31 @@ namespace BlockBlast
                 };
             }
 
-            // Nút mở Menu / Tạm dừng trên header
+            // Nút mở Menu / Tạm dừng trên header trong game
             if (btnPause != null)
             {
                 btnPause.Click += btnOpenMenu_Click;
             }
 
-            // Các nút chức năng nằm trong cụm pnlPause (Menu)
+            // Các nút chức năng nằm trong cụm pnlPause (Menu tạm dừng)
             if (btnResume != null) btnResume.Click += btnResume_Click;
             if (btnRestart != null) btnRestart.Click += btnRestart_Click;
             if (btnExit != null) btnExit.Click += btnExit_Click;
+            if (btnAbout != null) btnAbout.Click += btnAboutInPause_Click; // Nút About trong menu tạm dừng
 
-            // Nút replay ngoài bàn cờ (nếu có dùng riêng)
+            // Nút mở Menu chính (nếu có nút Back về Menu chính từ Pause)
+            //if (btnBackToMenu != null) btnBackToMenu.Click += (s, e) => ShowMainMenu();
+
+            // Các nút chức năng trên Menu chính (`pnlMainMenu`)
+            if (btnMenuPlay != null) btnMenuPlay.Click += btnMenuPlay_Click;
+            //if (btnMenuLeaderboard != null) btnMenuLeaderboard.Click += btnMenuLeaderboard_Click;
+            if (btnMenuAbout != null) btnMenuAbout.Click += btnMenuAbout_Click;
+            if (btnMenuExit != null) btnMenuExit.Click += btnMenuExit_Click;
+
+            // Nút Đóng panel About (`btnCloseAbout`)
+            if (btnCloseAbout != null) btnCloseAbout.Click += btnCloseAbout_Click;
+
+            // Nút replay ngoài bàn cờ
             if (btnReplay != null) btnReplay.Click += btnRestart_Click;
 
             this.Deactivate += (s, ev) => CancelDrag();
@@ -160,7 +176,140 @@ namespace BlockBlast
         }
 
         // ================================================================
-        //  2. BỐ CỤC GIAO DIỆN (LAYOUT)
+        //  2. QUẢN LÝ GIAO DIỆN & MENU (PANEL NAVIGATION)
+        // ================================================================
+
+        private void ShowMainMenu()
+        {
+            CancelDrag();
+            // Ẩn giao diện bàn chơi và các panel phụ khác
+            if (pnlBoard != null) pnlBoard.Visible = false;
+            if (pnlDock != null) pnlDock.Visible = false;
+            if (pnlHeader != null) pnlHeader.Visible = false;
+            if (pnlPause != null) pnlPause.Visible = false;
+            if (pnlGameOver != null) pnlGameOver.Visible = false;
+            if (pnlAbout != null) pnlAbout.Visible = false;
+
+            // Hiển thị Menu chính và căn giữa Form
+            if (pnlMainMenu != null)
+            {
+                pnlMainMenu.Parent = this;
+                pnlMainMenu.Location = new Point(
+                    (this.ClientSize.Width - pnlMainMenu.Width) / 2,
+                    (this.ClientSize.Height - pnlMainMenu.Height) / 2
+                );
+                pnlMainMenu.Visible = true;
+                pnlMainMenu.BringToFront();
+            }
+        }
+
+        // 1. Nút "Bắt đầu chơi" trên Menu chính
+        private void btnMenuPlay_Click(object sender, EventArgs e)
+        {
+            if (pnlMainMenu != null) pnlMainMenu.Visible = false;
+
+            if (pnlBoard != null) pnlBoard.Visible = true;
+            if (pnlDock != null) pnlDock.Visible = true;
+            if (pnlHeader != null) pnlHeader.Visible = true;
+
+            // Kiểm tra: Nếu game trước đó vẫn còn dang dở và chưa thua thì tiếp tục, ngược lại tạo mới
+            if (isGameInProgress && !isGameOver)
+            {
+                gameManager.IsPaused = false;
+                pnlBoard.Invalidate();
+            }
+            else
+            {
+                LoadGameSessionOrTutorial();
+                isGameInProgress = true;
+                isGameOver = false;
+            }
+        }
+
+        // 2. Nút "Bảng xếp hạng" trên Menu chính
+        private void btnMenuLeaderboard_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var topScores = ScoreManager.LoadLeaderboardScores();
+                string leaderboardText = "--- BẢNG XẾP HẠNG TOP CAO THỦ ---\n\n";
+                int rank = 1;
+                foreach (var entry in topScores)
+                {
+                    leaderboardText += $"{rank}. {entry.PlayerName}: {entry.Score} điểm ({entry.Date:dd/MM/yyyy})\n";
+                    rank++;
+                    if (rank > 10) break;
+                }
+                if (topScores.Count == 0) leaderboardText += "Chưa có dữ liệu thành tích nào!";
+
+                MessageBox.Show(leaderboardText, "Bảng Xếp Hạng", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch { }
+        }
+
+        // 3. Nút "Thông tin nhóm" trên Menu chính
+        private void btnMenuAbout_Click(object sender, EventArgs e)
+        {
+            if (pnlMainMenu != null) pnlMainMenu.Visible = false;
+            if (pnlAbout != null)
+            {
+                pnlAbout.Parent = this;
+                pnlAbout.Location = new Point(
+                    (this.ClientSize.Width - pnlAbout.Width) / 2,
+                    (this.ClientSize.Height - pnlAbout.Height) / 2
+                );
+                pnlAbout.Visible = true;
+                pnlAbout.BringToFront();
+            }
+        }
+
+        // 4. Nút "Thoát" trên Menu chính
+        private void btnMenuExit_Click(object sender, EventArgs e)
+        {
+            if (MessageBox.Show("Bạn có chắc chắn muốn thoát game không?", "Xác nhận thoát", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            {
+                Application.Exit();
+            }
+        }
+
+        // 5. Nút "About" khi đang trong menu tạm dừng (`pnlPause`)
+        private void btnAboutInPause_Click(object sender, EventArgs e)
+        {
+            if (pnlPause != null) pnlPause.Visible = false;
+            if (pnlAbout != null)
+            {
+                pnlAbout.Parent = this;
+                pnlAbout.Location = new Point(
+                    (this.ClientSize.Width - pnlAbout.Width) / 2,
+                    (this.ClientSize.Height - pnlAbout.Height) / 2
+                );
+                pnlAbout.Visible = true;
+                pnlAbout.BringToFront();
+            }
+        }
+
+        // 6. Nút đóng Panel About (`btnCloseAbout`)
+        private void btnCloseAbout_Click(object sender, EventArgs e)
+        {
+            if (pnlAbout != null) pnlAbout.Visible = false;
+
+            // Nếu đang trong game thì quay lại menu tạm dừng (`pnlPause`), ngược lại về Menu chính
+            if (isGameInProgress && !isGameOver && gameManager.IsPaused)
+            {
+                if (pnlPause != null)
+                {
+                    pnlPause.Visible = true;
+                    pnlPause.BringToFront();
+                }
+            }
+            else
+            {
+                ShowMainMenu();
+            }
+        }
+
+        // ================================================================
+        //  3. BỐ CỤC GIAO DIỆN (LAYOUT)
         // ================================================================
 
         private void LayoutGameControls()
@@ -210,7 +359,7 @@ namespace BlockBlast
         private void ApplyModernTheme()
         {
             BoardRenderer.ApplyModernTheme(
-                new Button[] { btnSound, btnResume, btnRestart, btnExit, btnReplay, btnPause },
+                new Button[] { btnSound, btnResume, btnRestart, btnExit, btnReplay, btnPause, btnAbout, btnCloseAbout },
                 new Panel[] { pnlDockPiece1, pnlDockPiece2, pnlDockPiece3 }
             );
 
@@ -239,7 +388,7 @@ namespace BlockBlast
         }
 
         // ================================================================
-        //  3. SỰ KIỆN VẼ GIAO DIỆN (PAINT EVENTS)
+        //  4. SỰ KIỆN VẼ GIAO DIỆN (PAINT EVENTS)
         // ================================================================
 
         private void pnlBoard_Paint(object sender, PaintEventArgs e)
@@ -269,7 +418,7 @@ namespace BlockBlast
         }
 
         // ================================================================
-        //  4. ĐIỀU KHIỂN KÉO THẢ (DRAG & DROP CONTROLS)
+        //  5. ĐIỀU KHIỂN KÉO THẢ (DRAG & DROP CONTROLS)
         // ================================================================
 
         private void pnlDockPiece_MouseDown(object sender, MouseEventArgs e)
@@ -441,7 +590,7 @@ namespace BlockBlast
         }
 
         // ================================================================
-        //  5. HOẠT HỌA VÀ HIỆU ỨNG (ANIMATIONS & EFFECTS)
+        //  6. HOẠT HỌA VÀ HIỆU ỨNG (ANIMATIONS & EFFECTS)
         // ================================================================
 
         private async Task<bool> AnimateLineClearAsync()
@@ -529,7 +678,7 @@ namespace BlockBlast
         }
 
         // ================================================================
-        //  6. XỬ LÝ MENU, NÚT BẤM & GAME OVER (CONTROLS & MENU ACTIONS)
+        //  7. XỬ LÝ GAMEPLAY & MENU TẠM DỪNG (PAUSE ACTIONS)
         // ================================================================
 
         private void LoadPuzzleLevel()
@@ -579,9 +728,14 @@ namespace BlockBlast
         {
             CancelDrag();
             isGameOver = true;
+            isGameInProgress = false; // Hết ván, đánh dấu là không còn game dang dở
+
             int current = gameManager.CurrentScore;
             if (current > gameManager.HighScore) gameManager.HighScore = current;
             ScoreManager.SaveHighScoreSilently(gameManager.HighScore);
+
+            // Lưu điểm số vào bảng xếp hạng Top 10
+            ScoreManager.SaveLeaderboardScore("Player", current);
 
             try
             {
@@ -601,7 +755,7 @@ namespace BlockBlast
             pnlBoard.Invalidate();
         }
 
-        // 1. Mở Panel Menu (pnlPause) và tạm dừng game
+        // Mở Panel Menu Tạm dừng (`pnlPause`) khi đang chơi
         private void btnOpenMenu_Click(object sender, EventArgs e)
         {
             CancelDrag();
@@ -609,24 +763,18 @@ namespace BlockBlast
 
             if (pnlPause != null)
             {
-                // 1. Ép pnlPause thuộc về Form chính (tránh việc nó bị kẹt trong panel khác)
                 pnlPause.Parent = this;
-
-                // 2. Tự động căn giữa màn hình Form
                 pnlPause.Location = new Point(
                     (this.ClientSize.Width - pnlPause.Width) / 2,
                     (this.ClientSize.Height - pnlPause.Height) / 2
                 );
-
-                // 3. Hiển thị và đưa lên lớp trên cùng tuyệt đối
                 pnlPause.Visible = true;
                 pnlPause.BringToFront();
             }
             pnlBoard.Invalidate();
         }
 
-
-        // 2. Nút "Tiếp tục" trong menu: ẩn panel menu và chơi tiếp
+        // Nút "Tiếp tục" trong menu tạm dừng
         private void btnResume_Click(object sender, EventArgs e)
         {
             gameManager.IsPaused = false;
@@ -637,7 +785,7 @@ namespace BlockBlast
             pnlBoard.Invalidate();
         }
 
-        // 3. Nút "Chơi lại từ đầu" (Restart / Replay): Reset toàn bộ bàn chơi và điểm
+        // Nút "Chơi lại từ đầu" (Restart / Replay)
         private void btnRestart_Click(object sender, EventArgs e)
         {
             if (isProcessingMove) return;
@@ -646,6 +794,7 @@ namespace BlockBlast
             if (pnlPause != null) pnlPause.Visible = false;
 
             isGameOver = false;
+            isGameInProgress = true;
             if (btnReplay != null) btnReplay.Visible = false;
 
             gameManager.ResetGame();
@@ -661,7 +810,7 @@ namespace BlockBlast
             pnlBoard.Invalidate();
         }
 
-        // 4. Nút "Thoát": Xác nhận thoát ứng dụng
+        // Nút "Thoát ứng dụng"
         private void btnExit_Click(object sender, EventArgs e)
         {
             CancelDrag();
@@ -677,7 +826,7 @@ namespace BlockBlast
             floatingTextTimer.Dispose();
             if (dragGhost != null && !dragGhost.IsDisposed) dragGhost.Dispose();
 
-            if (!isGameOver)
+            if (!isGameOver && isGameInProgress)
             {
                 gameManager.SaveGameState(pnlDockPiece1, pnlDockPiece2, pnlDockPiece3);
             }
