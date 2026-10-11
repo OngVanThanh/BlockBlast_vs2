@@ -64,6 +64,7 @@ namespace BlockBlast
             this.btnSound = new System.Windows.Forms.Button();
             this.btnResume = new System.Windows.Forms.Button();
             this.pnlBoard = new BlockBlast.Module.BufferedPanel();
+            this.pnlMenuIteam = new System.Windows.Forms.Panel();
             this.pnlDock.SuspendLayout();
             this.pnlHeader.SuspendLayout();
             this.pnlScoreGroup.SuspendLayout();
@@ -447,7 +448,6 @@ namespace BlockBlast
             this.btnAbout.TabIndex = 6;
             this.btnAbout.Text = "button1";
             this.btnAbout.UseVisualStyleBackColor = true;
-            //this.btnAbout.Click += new System.EventHandler(this.btnAbout_Click);
             // 
             // btnRestart
             // 
@@ -523,12 +523,21 @@ namespace BlockBlast
             this.pnlBoard.TabIndex = 0;
             this.pnlBoard.Paint += new System.Windows.Forms.PaintEventHandler(this.pnlBoard_Paint);
             // 
+            // pnlMenuIteam
+            // 
+            this.pnlMenuIteam.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(192)))));
+            this.pnlMenuIteam.Location = new System.Drawing.Point(1386, 283);
+            this.pnlMenuIteam.Name = "pnlMenuIteam";
+            this.pnlMenuIteam.Size = new System.Drawing.Size(95, 298);
+            this.pnlMenuIteam.TabIndex = 5;
+            // 
             // fGamePlay
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(16)))), ((int)(((byte)(19)))), ((int)(((byte)(28)))));
             this.ClientSize = new System.Drawing.Size(1902, 1033);
+            this.Controls.Add(this.pnlMenuIteam);
             this.Controls.Add(this.pnlPause);
             this.Controls.Add(this.pnlGameOver);
             this.Controls.Add(this.pnlHeader);
@@ -595,6 +604,7 @@ namespace BlockBlast
         private System.Windows.Forms.Button btnMenuExit;
         private System.Windows.Forms.Button btnMenuSound;
         private System.Windows.Forms.Button btnMenuPlay;
+        private System.Windows.Forms.Panel pnlMenuIteam;
     }
 }
 
