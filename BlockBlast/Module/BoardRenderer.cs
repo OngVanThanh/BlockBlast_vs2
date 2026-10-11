@@ -615,5 +615,93 @@ namespace BlockBlast
                 g.DrawString(recordText, recordFont, recordBrush, new RectangleF(0, h * 0.44f, w, 36), sf);
             }
         }
+public static void ApplyModernTheme(Button[] buttons, Panel[] docks)
+        {
+            foreach (Button btn in buttons)
+            {
+                if (btn != null)
+                {
+                    btn.Cursor = Cursors.Hand;
+                    ApplyRoundedRegion(btn, 12);
+                }
+            }
+
+            foreach (Panel dock in docks)
+            {
+                if (dock != null)
+                {
+                    dock.Cursor = Cursors.Hand;
+                    ApplyRoundedRegion(dock, 16);
+                }
+            }
+        }
+
+        public static void ApplyRoundedRegion(Control control, int radius)
+        {
+            using (GraphicsPath path = CreateRoundedPath(new Rectangle(0, 0, control.Width, control.Height), radius))
+            {
+                control.Region = new Region(path);
+            }
+        }
+
+        // Sự kiện vẽ khung điểm bo góc tối sang trọng (#1E2235)
+        public static void DrawScoreGroupBackground(object sender, PaintEventArgs e)
+        {
+            if (!(sender is Control pnl)) return;
+
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            Rectangle rect = new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1);
+            using (GraphicsPath path = CreateRoundedPath(rect, 14))
+            using (Brush bg = new SolidBrush(Color.FromArgb(30, 34, 53)))
+            using (Pen border = new Pen(Color.FromArgb(48, 54, 80)))
+            {
+                g.FillPath(bg, path);
+                g.DrawPath(border, path);
+            }
+
+            using (Pen separator = new Pen(Color.FromArgb(48, 54, 80)))
+            {
+                g.DrawLine(separator, 190, 16, 190, rect.Height - 16);
+            }
+        }
+
+        // Cập nhật giá trị lên các Label điểm số
+        public static void UpdateScoreLabels(Label lblScore, Label lblBestScore, GameManager gameManager)
+        {
+            if (lblScore != null) lblScore.Text = gameManager.CurrentScore.ToString();
+            if (lblBestScore != null) lblBestScore.Text = gameManager.HighScore.ToString();
+        }
+        public static PointF GetCellsCenter(Size boardSize, IEnumerable<Point> cells)
+        {
+            int cellSize = CalculateCellSize(boardSize);
+            float sumX = 0, sumY = 0;
+            int count = 0;
+
+            foreach (Point p in cells)
+            {
+                Rectangle rect = GetCellRect(p.Y, p.X, cellSize);
+                sumX += rect.X + rect.Width / 2f;
+                sumY += rect.Y + rect.Height / 2f;
+                count++;
+            }
+
+            int boardDim = GetBoardPixelSize(cellSize);
+            if (count == 0) return new PointF(boardDim / 2f, boardDim / 2f);
+
+            // Giữ chữ nằm trọn trong bàn cờ
+            float x = Math.Max(120f, Math.Min(boardDim - 120f, sumX / count));
+            float y = Math.Max(110f, Math.Min(boardDim - 50f, sumY / count));
+            return new PointF(x, y);
+        }
+
+        // Tạo nội dung thông báo combo dựa trên số dòng ăn được
+        public static string BuildComboText(int linesCleared, int scoreGained)
+        {
+            if (linesCleared >= 4) return "MEGA BLAST!\n+" + scoreGained;
+            if (scoreGained >= 200) return "COMBO x" + linesCleared + "!\n+" + scoreGained;
+            return "+" + scoreGained;
+        }
     }
 }
