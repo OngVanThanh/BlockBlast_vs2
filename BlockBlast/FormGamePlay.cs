@@ -382,10 +382,7 @@ namespace BlockBlast
             }
         }
 
-        private void pnlScoreGroup_Paint(object sender, PaintEventArgs e)
-        {
-            BoardRenderer.DrawScoreGroupBackground(sender, e);
-        }
+
 
         // ================================================================
         //  4. SỰ KIỆN VẼ GIAO DIỆN (PAINT EVENTS)
@@ -700,16 +697,23 @@ namespace BlockBlast
             pnlBoard.Invalidate();
         }
 
+        // Hàm gọi để sinh và hiển thị 3 khối mới lên Dock
         private void GenerateNewPieces()
         {
-            SetupDockPiece(pnlDockPiece1);
-            SetupDockPiece(pnlDockPiece2);
-            SetupDockPiece(pnlDockPiece3);
+            // Gọi hàm tối ưu từ GameManager để lấy bộ 3 khối chắc chắn giải được đồng thời
+            List<BlockPiece> validPieces = gameManager.GenerateValidPieceSet();
+
+            if (validPieces != null && validPieces.Count >= 3)
+            {
+                SetupDockPiece(pnlDockPiece1, validPieces[0]);
+                SetupDockPiece(pnlDockPiece2, validPieces[1]);
+                SetupDockPiece(pnlDockPiece3, validPieces[2]);
+            }
         }
 
-        private void SetupDockPiece(Panel dockPanel)
+        private void SetupDockPiece(Panel dockPanel, BlockPiece piece)
         {
-            dockPanel.Tag = gameManager.CreateRandomPiece();
+            dockPanel.Tag = piece;
             dockPanel.Visible = true;
             dockPanel.Invalidate();
         }

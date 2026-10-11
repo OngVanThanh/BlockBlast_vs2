@@ -17,11 +17,9 @@ namespace BlockBlast.Module
     {
         private static string GetAppDataFolder()
         {
-            string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BlockBlast");
-            if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
-            return folder;
+            // Trả về thư mục chạy hiện tại của ứng dụng
+            return AppDomain.CurrentDomain.BaseDirectory;
         }
-
         public static int LoadSavedHighScore()
         {
             try
