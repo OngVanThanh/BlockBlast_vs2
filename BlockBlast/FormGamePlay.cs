@@ -839,14 +839,6 @@ namespace BlockBlast
             btnSound.Text = SoundManager.IsMuted ? "LOA: TẮT" : "LOA: BẬT";
         }
 
-        private void lblAboutTitle_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void textBox1_TextChanged(object sender, EventArgs e)
-        {
-
-        }
+        
     }
 }

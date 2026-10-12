@@ -45,29 +45,29 @@ namespace BlockBlast
             this.lblFinalScore = new System.Windows.Forms.Label();
             this.lblGameOverTitle = new System.Windows.Forms.Label();
             this.pnlPause = new System.Windows.Forms.Panel();
-            this.pnlMainMenu = new System.Windows.Forms.Panel();
-            this.btnMenuExit = new System.Windows.Forms.Button();
-            this.btnMenuPlay = new System.Windows.Forms.Button();
+            this.pnlAbout = new System.Windows.Forms.Panel();
+            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.lblAboutTitle = new System.Windows.Forms.Label();
+            this.btnCloseAbout = new System.Windows.Forms.Button();
+            this.btnBackToMenu = new System.Windows.Forms.Button();
             this.btnRestart = new System.Windows.Forms.Button();
             this.btnExit = new System.Windows.Forms.Button();
             this.btnSound = new System.Windows.Forms.Button();
             this.btnResume = new System.Windows.Forms.Button();
-            this.pnlMenuIteam = new System.Windows.Forms.Panel();
+            this.pnlMainMenu = new System.Windows.Forms.Panel();
             this.btnNewGameMenu = new System.Windows.Forms.Button();
-            this.btnBackToMenu = new System.Windows.Forms.Button();
-            this.btnCloseAbout = new System.Windows.Forms.Button();
-            this.lblAboutTitle = new System.Windows.Forms.Label();
-            this.pnlAbout = new System.Windows.Forms.Panel();
             this.btnMenuAbout = new System.Windows.Forms.Button();
+            this.btnMenuExit = new System.Windows.Forms.Button();
+            this.btnMenuPlay = new System.Windows.Forms.Button();
+            this.pnlMenuIteam = new System.Windows.Forms.Panel();
             this.pnlBoard = new BlockBlast.Module.BufferedPanel();
-            this.textBox1 = new System.Windows.Forms.TextBox();
             this.pnlDock.SuspendLayout();
             this.pnlHeader.SuspendLayout();
             this.pnlScoreGroup.SuspendLayout();
             this.pnlGameOver.SuspendLayout();
             this.pnlPause.SuspendLayout();
-            this.pnlMainMenu.SuspendLayout();
             this.pnlAbout.SuspendLayout();
+            this.pnlMainMenu.SuspendLayout();
             this.SuspendLayout();
             // 
             // pnlDock
@@ -78,7 +78,7 @@ namespace BlockBlast
             this.pnlDock.Controls.Add(this.pnlDockPiece1);
             this.pnlDock.Dock = System.Windows.Forms.DockStyle.Bottom;
             this.pnlDock.Location = new System.Drawing.Point(0, 463);
-            this.pnlDock.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.pnlDock.Margin = new System.Windows.Forms.Padding(2);
             this.pnlDock.Name = "pnlDock";
             this.pnlDock.Size = new System.Drawing.Size(1028, 146);
             this.pnlDock.TabIndex = 1;
@@ -87,7 +87,7 @@ namespace BlockBlast
             // 
             this.pnlDockPiece3.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(34)))), ((int)(((byte)(53)))));
             this.pnlDockPiece3.Location = new System.Drawing.Point(788, 12);
-            this.pnlDockPiece3.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.pnlDockPiece3.Margin = new System.Windows.Forms.Padding(2);
             this.pnlDockPiece3.Name = "pnlDockPiece3";
             this.pnlDockPiece3.Size = new System.Drawing.Size(112, 122);
             this.pnlDockPiece3.TabIndex = 2;
@@ -99,7 +99,7 @@ namespace BlockBlast
             // 
             this.pnlDockPiece2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(34)))), ((int)(((byte)(53)))));
             this.pnlDockPiece2.Location = new System.Drawing.Point(660, 12);
-            this.pnlDockPiece2.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.pnlDockPiece2.Margin = new System.Windows.Forms.Padding(2);
             this.pnlDockPiece2.Name = "pnlDockPiece2";
             this.pnlDockPiece2.Size = new System.Drawing.Size(112, 122);
             this.pnlDockPiece2.TabIndex = 1;
@@ -111,7 +111,7 @@ namespace BlockBlast
             // 
             this.pnlDockPiece1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(34)))), ((int)(((byte)(53)))));
             this.pnlDockPiece1.Location = new System.Drawing.Point(532, 12);
-            this.pnlDockPiece1.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.pnlDockPiece1.Margin = new System.Windows.Forms.Padding(2);
             this.pnlDockPiece1.Name = "pnlDockPiece1";
             this.pnlDockPiece1.Size = new System.Drawing.Size(112, 122);
             this.pnlDockPiece1.TabIndex = 0;
@@ -127,7 +127,7 @@ namespace BlockBlast
             this.pnlHeader.Dock = System.Windows.Forms.DockStyle.Top;
             this.pnlHeader.ForeColor = System.Drawing.Color.White;
             this.pnlHeader.Location = new System.Drawing.Point(0, 0);
-            this.pnlHeader.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.pnlHeader.Margin = new System.Windows.Forms.Padding(2);
             this.pnlHeader.Name = "pnlHeader";
             this.pnlHeader.Size = new System.Drawing.Size(1028, 73);
             this.pnlHeader.TabIndex = 3;
@@ -142,7 +142,7 @@ namespace BlockBlast
             this.btnPause.ImageAlign = System.Drawing.ContentAlignment.BottomCenter;
             this.btnPause.ImageKey = "(none)";
             this.btnPause.Location = new System.Drawing.Point(1298, 16);
-            this.btnPause.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.btnPause.Margin = new System.Windows.Forms.Padding(2);
             this.btnPause.Name = "btnPause";
             this.btnPause.Size = new System.Drawing.Size(82, 39);
             this.btnPause.TabIndex = 4;
@@ -159,7 +159,7 @@ namespace BlockBlast
             this.pnlScoreGroup.Controls.Add(this.lblScoreTitle);
             this.pnlScoreGroup.ForeColor = System.Drawing.Color.White;
             this.pnlScoreGroup.Location = new System.Drawing.Point(64, 10);
-            this.pnlScoreGroup.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.pnlScoreGroup.Margin = new System.Windows.Forms.Padding(2);
             this.pnlScoreGroup.Name = "pnlScoreGroup";
             this.pnlScoreGroup.Size = new System.Drawing.Size(300, 57);
             this.pnlScoreGroup.TabIndex = 0;
@@ -224,7 +224,7 @@ namespace BlockBlast
             this.pnlGameOver.Controls.Add(this.lblFinalScore);
             this.pnlGameOver.Controls.Add(this.lblGameOverTitle);
             this.pnlGameOver.Location = new System.Drawing.Point(760, 103);
-            this.pnlGameOver.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.pnlGameOver.Margin = new System.Windows.Forms.Padding(2);
             this.pnlGameOver.Name = "pnlGameOver";
             this.pnlGameOver.Size = new System.Drawing.Size(375, 406);
             this.pnlGameOver.TabIndex = 1;
@@ -240,7 +240,7 @@ namespace BlockBlast
             this.btnReplay.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnReplay.ForeColor = System.Drawing.Color.White;
             this.btnReplay.Location = new System.Drawing.Point(120, 219);
-            this.btnReplay.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.btnReplay.Margin = new System.Windows.Forms.Padding(2);
             this.btnReplay.Name = "btnReplay";
             this.btnReplay.Size = new System.Drawing.Size(135, 41);
             this.btnReplay.TabIndex = 3;
@@ -293,59 +293,73 @@ namespace BlockBlast
             this.pnlPause.Controls.Add(this.btnSound);
             this.pnlPause.Controls.Add(this.btnResume);
             this.pnlPause.Location = new System.Drawing.Point(28, 122);
-            this.pnlPause.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.pnlPause.Margin = new System.Windows.Forms.Padding(2);
             this.pnlPause.Name = "pnlPause";
             this.pnlPause.Size = new System.Drawing.Size(375, 406);
             this.pnlPause.TabIndex = 4;
             this.pnlPause.Visible = false;
             // 
-            // pnlMainMenu
+            // pnlAbout
             // 
-            this.pnlMainMenu.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(18)))), ((int)(((byte)(21)))), ((int)(((byte)(32)))));
-            this.pnlMainMenu.Controls.Add(this.btnNewGameMenu);
-            this.pnlMainMenu.Controls.Add(this.btnMenuAbout);
-            this.pnlMainMenu.Controls.Add(this.btnMenuExit);
-            this.pnlMainMenu.Controls.Add(this.btnMenuPlay);
-            this.pnlMainMenu.Location = new System.Drawing.Point(429, 123);
-            this.pnlMainMenu.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
-            this.pnlMainMenu.Name = "pnlMainMenu";
-            this.pnlMainMenu.Size = new System.Drawing.Size(375, 406);
-            this.pnlMainMenu.TabIndex = 8;
-            this.pnlMainMenu.Visible = false;
+            this.pnlAbout.Controls.Add(this.textBox1);
+            this.pnlAbout.Controls.Add(this.lblAboutTitle);
+            this.pnlAbout.Controls.Add(this.btnCloseAbout);
+            this.pnlAbout.Location = new System.Drawing.Point(54, 269);
+            this.pnlAbout.Margin = new System.Windows.Forms.Padding(2);
+            this.pnlAbout.Name = "pnlAbout";
+            this.pnlAbout.Size = new System.Drawing.Size(264, 138);
+            this.pnlAbout.TabIndex = 7;
+            this.pnlAbout.Visible = false;
             // 
-            // btnMenuExit
+            // textBox1
             // 
-            this.btnMenuExit.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(40)))), ((int)(((byte)(45)))), ((int)(((byte)(66)))));
-            this.btnMenuExit.FlatAppearance.BorderSize = 0;
-            this.btnMenuExit.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(63)))), ((int)(((byte)(70)))), ((int)(((byte)(102)))));
-            this.btnMenuExit.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(53)))), ((int)(((byte)(59)))), ((int)(((byte)(87)))));
-            this.btnMenuExit.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnMenuExit.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnMenuExit.ForeColor = System.Drawing.Color.White;
-            this.btnMenuExit.Location = new System.Drawing.Point(68, 223);
-            this.btnMenuExit.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
-            this.btnMenuExit.Name = "btnMenuExit";
-            this.btnMenuExit.Size = new System.Drawing.Size(225, 37);
-            this.btnMenuExit.TabIndex = 5;
-            this.btnMenuExit.Text = "🚪 THOÁT GAME";
-            this.btnMenuExit.UseVisualStyleBackColor = false;
+            this.textBox1.Enabled = false;
+            this.textBox1.Location = new System.Drawing.Point(46, 47);
+            this.textBox1.Multiline = true;
+            this.textBox1.Name = "textBox1";
+            this.textBox1.ReadOnly = true;
+            this.textBox1.Size = new System.Drawing.Size(193, 37);
+            this.textBox1.TabIndex = 2;
+            this.textBox1.Text = "Logic Game: Văn Thanh, Tuấn Hưng Giao diện: Quang Hưng, Tấn Phát";
             // 
-            // btnMenuPlay
+            // lblAboutTitle
             // 
-            this.btnMenuPlay.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(40)))), ((int)(((byte)(45)))), ((int)(((byte)(66)))));
-            this.btnMenuPlay.FlatAppearance.BorderSize = 0;
-            this.btnMenuPlay.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(63)))), ((int)(((byte)(70)))), ((int)(((byte)(102)))));
-            this.btnMenuPlay.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(53)))), ((int)(((byte)(59)))), ((int)(((byte)(87)))));
-            this.btnMenuPlay.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnMenuPlay.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnMenuPlay.ForeColor = System.Drawing.Color.White;
-            this.btnMenuPlay.Location = new System.Drawing.Point(68, 77);
-            this.btnMenuPlay.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
-            this.btnMenuPlay.Name = "btnMenuPlay";
-            this.btnMenuPlay.Size = new System.Drawing.Size(225, 37);
-            this.btnMenuPlay.TabIndex = 2;
-            this.btnMenuPlay.Text = "▶ TIẾP TỤC";
-            this.btnMenuPlay.UseVisualStyleBackColor = false;
+            this.lblAboutTitle.AutoSize = true;
+            this.lblAboutTitle.ForeColor = System.Drawing.SystemColors.ButtonHighlight;
+            this.lblAboutTitle.Location = new System.Drawing.Point(97, 31);
+            this.lblAboutTitle.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.lblAboutTitle.Name = "lblAboutTitle";
+            this.lblAboutTitle.Size = new System.Drawing.Size(91, 13);
+            this.lblAboutTitle.TabIndex = 1;
+            this.lblAboutTitle.Text = "Đội ngũ phát triển";
+            // 
+            // btnCloseAbout
+            // 
+            this.btnCloseAbout.Location = new System.Drawing.Point(206, 8);
+            this.btnCloseAbout.Margin = new System.Windows.Forms.Padding(2);
+            this.btnCloseAbout.Name = "btnCloseAbout";
+            this.btnCloseAbout.Size = new System.Drawing.Size(56, 19);
+            this.btnCloseAbout.TabIndex = 0;
+            this.btnCloseAbout.Text = "Đóng";
+            this.btnCloseAbout.UseVisualStyleBackColor = true;
+            this.btnCloseAbout.Click += new System.EventHandler(this.btnCloseAbout_Click);
+            // 
+            // btnBackToMenu
+            // 
+            this.btnBackToMenu.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(40)))), ((int)(((byte)(45)))), ((int)(((byte)(66)))));
+            this.btnBackToMenu.FlatAppearance.BorderSize = 0;
+            this.btnBackToMenu.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(63)))), ((int)(((byte)(70)))), ((int)(((byte)(102)))));
+            this.btnBackToMenu.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(53)))), ((int)(((byte)(59)))), ((int)(((byte)(87)))));
+            this.btnBackToMenu.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnBackToMenu.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnBackToMenu.ForeColor = System.Drawing.Color.White;
+            this.btnBackToMenu.Location = new System.Drawing.Point(69, 177);
+            this.btnBackToMenu.Margin = new System.Windows.Forms.Padding(2);
+            this.btnBackToMenu.Name = "btnBackToMenu";
+            this.btnBackToMenu.Size = new System.Drawing.Size(224, 37);
+            this.btnBackToMenu.TabIndex = 6;
+            this.btnBackToMenu.Text = "🏠 VỀ MENU CHÍNH";
+            this.btnBackToMenu.UseVisualStyleBackColor = false;
             // 
             // btnRestart
             // 
@@ -357,7 +371,7 @@ namespace BlockBlast
             this.btnRestart.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnRestart.ForeColor = System.Drawing.Color.White;
             this.btnRestart.Location = new System.Drawing.Point(68, 126);
-            this.btnRestart.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.btnRestart.Margin = new System.Windows.Forms.Padding(2);
             this.btnRestart.Name = "btnRestart";
             this.btnRestart.Size = new System.Drawing.Size(225, 37);
             this.btnRestart.TabIndex = 3;
@@ -374,7 +388,7 @@ namespace BlockBlast
             this.btnExit.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnExit.ForeColor = System.Drawing.Color.White;
             this.btnExit.Location = new System.Drawing.Point(68, 224);
-            this.btnExit.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.btnExit.Margin = new System.Windows.Forms.Padding(2);
             this.btnExit.Name = "btnExit";
             this.btnExit.Size = new System.Drawing.Size(225, 37);
             this.btnExit.TabIndex = 5;
@@ -391,7 +405,7 @@ namespace BlockBlast
             this.btnSound.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnSound.ForeColor = System.Drawing.Color.White;
             this.btnSound.Location = new System.Drawing.Point(68, 28);
-            this.btnSound.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.btnSound.Margin = new System.Windows.Forms.Padding(2);
             this.btnSound.Name = "btnSound";
             this.btnSound.Size = new System.Drawing.Size(225, 37);
             this.btnSound.TabIndex = 1;
@@ -408,21 +422,26 @@ namespace BlockBlast
             this.btnResume.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnResume.ForeColor = System.Drawing.Color.White;
             this.btnResume.Location = new System.Drawing.Point(68, 77);
-            this.btnResume.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.btnResume.Margin = new System.Windows.Forms.Padding(2);
             this.btnResume.Name = "btnResume";
             this.btnResume.Size = new System.Drawing.Size(225, 37);
             this.btnResume.TabIndex = 2;
             this.btnResume.Text = "▶ TIẾP TỤC";
             this.btnResume.UseVisualStyleBackColor = false;
             // 
-            // pnlMenuIteam
+            // pnlMainMenu
             // 
-            this.pnlMenuIteam.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(192)))));
-            this.pnlMenuIteam.Location = new System.Drawing.Point(1040, 230);
-            this.pnlMenuIteam.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
-            this.pnlMenuIteam.Name = "pnlMenuIteam";
-            this.pnlMenuIteam.Size = new System.Drawing.Size(71, 242);
-            this.pnlMenuIteam.TabIndex = 5;
+            this.pnlMainMenu.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(18)))), ((int)(((byte)(21)))), ((int)(((byte)(32)))));
+            this.pnlMainMenu.Controls.Add(this.btnNewGameMenu);
+            this.pnlMainMenu.Controls.Add(this.btnMenuAbout);
+            this.pnlMainMenu.Controls.Add(this.btnMenuExit);
+            this.pnlMainMenu.Controls.Add(this.btnMenuPlay);
+            this.pnlMainMenu.Location = new System.Drawing.Point(429, 123);
+            this.pnlMainMenu.Margin = new System.Windows.Forms.Padding(2);
+            this.pnlMainMenu.Name = "pnlMainMenu";
+            this.pnlMainMenu.Size = new System.Drawing.Size(375, 406);
+            this.pnlMainMenu.TabIndex = 8;
+            this.pnlMainMenu.Visible = false;
             // 
             // btnNewGameMenu
             // 
@@ -441,60 +460,65 @@ namespace BlockBlast
             this.btnNewGameMenu.Text = "▶ TRÒ CHƠI MỚI";
             this.btnNewGameMenu.UseVisualStyleBackColor = false;
             // 
-            // btnBackToMenu
-            // 
-            this.btnBackToMenu.Location = new System.Drawing.Point(69, 177);
-            this.btnBackToMenu.Margin = new System.Windows.Forms.Padding(2);
-            this.btnBackToMenu.Name = "btnBackToMenu";
-            this.btnBackToMenu.Size = new System.Drawing.Size(224, 37);
-            this.btnBackToMenu.TabIndex = 6;
-            this.btnBackToMenu.Text = "VỀ MENU CHÍNH";
-            this.btnBackToMenu.UseVisualStyleBackColor = true;
-            // 
-            // btnCloseAbout
-            // 
-            this.btnCloseAbout.Location = new System.Drawing.Point(206, 8);
-            this.btnCloseAbout.Margin = new System.Windows.Forms.Padding(2);
-            this.btnCloseAbout.Name = "btnCloseAbout";
-            this.btnCloseAbout.Size = new System.Drawing.Size(56, 19);
-            this.btnCloseAbout.TabIndex = 0;
-            this.btnCloseAbout.Text = "Đóng";
-            this.btnCloseAbout.UseVisualStyleBackColor = true;
-            this.btnCloseAbout.Click += new System.EventHandler(this.btnCloseAbout_Click);
-            // 
-            // lblAboutTitle
-            // 
-            this.lblAboutTitle.AutoSize = true;
-            this.lblAboutTitle.ForeColor = System.Drawing.SystemColors.ButtonHighlight;
-            this.lblAboutTitle.Location = new System.Drawing.Point(97, 31);
-            this.lblAboutTitle.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
-            this.lblAboutTitle.Name = "lblAboutTitle";
-            this.lblAboutTitle.Size = new System.Drawing.Size(91, 13);
-            this.lblAboutTitle.TabIndex = 1;
-            this.lblAboutTitle.Text = "Đội ngũ phát triển";
-            this.lblAboutTitle.Click += new System.EventHandler(this.lblAboutTitle_Click);
-            // 
-            // pnlAbout
-            // 
-            this.pnlAbout.Controls.Add(this.textBox1);
-            this.pnlAbout.Controls.Add(this.lblAboutTitle);
-            this.pnlAbout.Controls.Add(this.btnCloseAbout);
-            this.pnlAbout.Location = new System.Drawing.Point(54, 269);
-            this.pnlAbout.Margin = new System.Windows.Forms.Padding(2);
-            this.pnlAbout.Name = "pnlAbout";
-            this.pnlAbout.Size = new System.Drawing.Size(264, 138);
-            this.pnlAbout.TabIndex = 7;
-            this.pnlAbout.Visible = false;
-            // 
             // btnMenuAbout
             // 
+            this.btnMenuAbout.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(40)))), ((int)(((byte)(45)))), ((int)(((byte)(66)))));
+            this.btnMenuAbout.FlatAppearance.BorderSize = 0;
+            this.btnMenuAbout.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(63)))), ((int)(((byte)(70)))), ((int)(((byte)(102)))));
+            this.btnMenuAbout.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(53)))), ((int)(((byte)(59)))), ((int)(((byte)(87)))));
+            this.btnMenuAbout.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnMenuAbout.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnMenuAbout.ForeColor = System.Drawing.Color.White;
             this.btnMenuAbout.Location = new System.Drawing.Point(68, 126);
             this.btnMenuAbout.Margin = new System.Windows.Forms.Padding(2);
             this.btnMenuAbout.Name = "btnMenuAbout";
-            this.btnMenuAbout.Size = new System.Drawing.Size(225, 39);
+            this.btnMenuAbout.Size = new System.Drawing.Size(225, 37);
             this.btnMenuAbout.TabIndex = 6;
-            this.btnMenuAbout.Text = "THÔNG TIN GAME";
-            this.btnMenuAbout.UseVisualStyleBackColor = true;
+            this.btnMenuAbout.Text = "ℹ️ THÔNG TIN GAME";
+            this.btnMenuAbout.UseVisualStyleBackColor = false;
+            // 
+            // btnMenuExit
+            // 
+            this.btnMenuExit.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(40)))), ((int)(((byte)(45)))), ((int)(((byte)(66)))));
+            this.btnMenuExit.FlatAppearance.BorderSize = 0;
+            this.btnMenuExit.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(63)))), ((int)(((byte)(70)))), ((int)(((byte)(102)))));
+            this.btnMenuExit.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(53)))), ((int)(((byte)(59)))), ((int)(((byte)(87)))));
+            this.btnMenuExit.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnMenuExit.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnMenuExit.ForeColor = System.Drawing.Color.White;
+            this.btnMenuExit.Location = new System.Drawing.Point(68, 223);
+            this.btnMenuExit.Margin = new System.Windows.Forms.Padding(2);
+            this.btnMenuExit.Name = "btnMenuExit";
+            this.btnMenuExit.Size = new System.Drawing.Size(225, 37);
+            this.btnMenuExit.TabIndex = 5;
+            this.btnMenuExit.Text = "🚪 THOÁT GAME";
+            this.btnMenuExit.UseVisualStyleBackColor = false;
+            // 
+            // btnMenuPlay
+            // 
+            this.btnMenuPlay.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(40)))), ((int)(((byte)(45)))), ((int)(((byte)(66)))));
+            this.btnMenuPlay.FlatAppearance.BorderSize = 0;
+            this.btnMenuPlay.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(63)))), ((int)(((byte)(70)))), ((int)(((byte)(102)))));
+            this.btnMenuPlay.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(53)))), ((int)(((byte)(59)))), ((int)(((byte)(87)))));
+            this.btnMenuPlay.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnMenuPlay.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnMenuPlay.ForeColor = System.Drawing.Color.White;
+            this.btnMenuPlay.Location = new System.Drawing.Point(68, 77);
+            this.btnMenuPlay.Margin = new System.Windows.Forms.Padding(2);
+            this.btnMenuPlay.Name = "btnMenuPlay";
+            this.btnMenuPlay.Size = new System.Drawing.Size(225, 37);
+            this.btnMenuPlay.TabIndex = 2;
+            this.btnMenuPlay.Text = "▶ TIẾP TỤC";
+            this.btnMenuPlay.UseVisualStyleBackColor = false;
+            // 
+            // pnlMenuIteam
+            // 
+            this.pnlMenuIteam.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(192)))));
+            this.pnlMenuIteam.Location = new System.Drawing.Point(1040, 230);
+            this.pnlMenuIteam.Margin = new System.Windows.Forms.Padding(2);
+            this.pnlMenuIteam.Name = "pnlMenuIteam";
+            this.pnlMenuIteam.Size = new System.Drawing.Size(71, 242);
+            this.pnlMenuIteam.TabIndex = 5;
             // 
             // pnlBoard
             // 
@@ -506,16 +530,6 @@ namespace BlockBlast
             this.pnlBoard.Size = new System.Drawing.Size(375, 406);
             this.pnlBoard.TabIndex = 0;
             this.pnlBoard.Paint += new System.Windows.Forms.PaintEventHandler(this.pnlBoard_Paint);
-            // 
-            // textBox1
-            // 
-            this.textBox1.Location = new System.Drawing.Point(46, 47);
-            this.textBox1.Multiline = true;
-            this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(193, 37);
-            this.textBox1.TabIndex = 2;
-            this.textBox1.Text = "Logic Game: Văn Thanh, Tuấn Hưng Giao diện: Quang Hưng, Tấn Phát";
-            this.textBox1.TextChanged += new System.EventHandler(this.textBox1_TextChanged);
             // 
             // fGamePlay
             // 
@@ -530,7 +544,7 @@ namespace BlockBlast
             this.Controls.Add(this.pnlHeader);
             this.Controls.Add(this.pnlDock);
             this.Controls.Add(this.pnlBoard);
-            this.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.Margin = new System.Windows.Forms.Padding(2);
             this.Name = "fGamePlay";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "BlockBlast";
@@ -545,9 +559,9 @@ namespace BlockBlast
             this.pnlScoreGroup.PerformLayout();
             this.pnlGameOver.ResumeLayout(false);
             this.pnlPause.ResumeLayout(false);
-            this.pnlMainMenu.ResumeLayout(false);
             this.pnlAbout.ResumeLayout(false);
             this.pnlAbout.PerformLayout();
+            this.pnlMainMenu.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
