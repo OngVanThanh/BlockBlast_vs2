@@ -62,6 +62,7 @@
     </Compile>
     <Compile Include="Module\GameBoard.cs" />
     <Compile Include="Module\GameManager.cs" />
+    <Compile Include="Module\Item.cs" />
     <Compile Include="Module\ScoreManager.cs" />
     <Compile Include="Module\TutorialManager.cs" />
     <Compile Include="Module\SoundManager.cs" />

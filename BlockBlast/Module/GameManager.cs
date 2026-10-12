@@ -1,6 +1,7 @@
 using BlockBlast.Module;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -29,6 +30,8 @@ namespace BlockBlast
         public int HighScore { get; set; }
         public bool IsPaused { get; set; }
 
+        // === Kho chứa 5 loại Item ===
+        public Dictionary<ItemType, Item> ItemsInventory { get; private set; }
         private readonly Random rand = new Random();
         public const int BOARD_SIZE = 8;
 
@@ -37,6 +40,9 @@ namespace BlockBlast
             Board = new GameBoard();
             CurrentScore = 0;
             HighScore = 0;
+            // === Khởi tạo và nạp file items.json ===
+            InitItems();
+            LoadItemsJson();
         }
 
         // ================================================================
@@ -545,6 +551,130 @@ namespace BlockBlast
                 }
             }
             return -1;
+        }
+        // ================================================================
+        //  4. HỆ THỐNG QUẢN LÝ ITEM & FILE items.json
+        // ================================================================
+
+        // Khởi tạo sẵn 5 món đồ trong kho với số lượng ban đầu là 0
+        private void InitItems()
+        {
+            ItemsInventory = new Dictionary<ItemType, Item>
+    {
+        { ItemType.RerollDock, new Item(ItemType.RerollDock, "Đổi Gạch", "Bấm để đổi 3 khối gạch mới", Color.FromArgb(52, 152, 219)) },
+        { ItemType.Bomb3x3, new Item(ItemType.Bomb3x3, "Bom 3x3", "Kéo đà ném nổ vùng 3x3", Color.FromArgb(231, 76, 60)) },
+        { ItemType.CrossClear, new Item(ItemType.CrossClear, "Tia Chữ Thập", "Kéo đà nổ hàng và cột", Color.FromArgb(241, 196, 15)) },
+        { ItemType.ColorLightning, new Item(ItemType.ColorLightning, "Sấm Sét", "Ngắm vào 1 ô để quét sạch các ô cùng màu", Color.FromArgb(155, 89, 182)) },
+        { ItemType.GravityFall, new Item(ItemType.GravityFall, "Trọng Lực", "Kéo đà dồn các khối rơi xuống đáy", Color.FromArgb(46, 204, 113)) }
+    };
+        }
+
+        // Thưởng Item khi người chơi ăn Combo n (n = số hàng + cột nổ)
+        public Item AwardComboItem(int linesCleared)
+        {
+            if (linesCleared >= 2)
+            {
+                // Nếu n > 6 thì lấy mốc 6 (Trọng lực)
+                ItemType type = (ItemType)Math.Min(linesCleared, 6);
+                if (ItemsInventory.ContainsKey(type))
+                {
+                    ItemsInventory[type].Add(1);
+                    SaveItemsJson(); // Tự động lưu lại ngay
+                    return ItemsInventory[type];
+                }
+            }
+            return null;
+        }
+
+        // Tạo khối nhỏ may mắn (1 đến 4 ô) cho Item 1 (Copy / Lucky Piece)
+        public BlockPiece GenerateLuckyPiece()
+        {
+            // Các khối nhỏ dễ đặt: 1x1, 1x2, 2x1, 1x3, 3x1, 2x2, chữ L nhỏ
+            List<int[,]> smallShapes = new List<int[,]>
+            {
+                new int[,] { { 1 } },                     // 1 ô
+                new int[,] { { 1, 1 } },                  // 2 ô ngang
+                new int[,] { { 1 }, { 1 } },              // 2 ô dọc
+                new int[,] { { 1, 1, 1 } },               // 3 ô ngang
+                new int[,] { { 1 }, { 1 }, { 1 } },       // 3 ô dọc
+                new int[,] { { 1, 1 }, { 1, 1 } },        // 4 ô vuông
+                new int[,] { { 1, 0 }, { 1, 1 } },        // 3 ô góc L
+                new int[,] { { 1, 1, 1, 1 } }             // 4 ô thẳng
+            };
+
+            int index = rand.Next(smallShapes.Count);
+            int color = rand.Next(1, 8);
+            return new BlockPiece(smallShapes[index], color);
+        }
+
+        // Đếm tổng số lượng tất cả Item còn trong kho
+        public int GetTotalItemCount()
+        {
+            if (ItemsInventory == null) return 0;
+            return ItemsInventory.Values.Sum(i => i.Count);
+        }
+
+        // Điều kiện GameOver mới: Bàn cờ hết nước đi VÀ kho đồ hết sạch Item
+        public bool CheckGameOverWithItems(List<BlockPiece> remainingPieces)
+        {
+            bool noMovesOnBoard = CheckGameOver(remainingPieces);
+            // Chỉ thua khi không còn nước đi VÀ tổng số Item == 0
+            return noMovesOnBoard && (GetTotalItemCount() == 0);
+        }
+
+        // Lưu kho đồ ra file items.json trong thư mục bin/Debug
+        public void SaveItemsJson()
+        {
+            try
+            {
+                string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "items.json");
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("{");
+                int i = 0;
+                foreach (var kvp in ItemsInventory)
+                {
+                    string comma = (++i < ItemsInventory.Count) ? "," : "";
+                    sb.AppendLine($"  \"{kvp.Key}\": {kvp.Value.Count}{comma}");
+                }
+                sb.AppendLine("}");
+                File.WriteAllText(path, sb.ToString());
+            }
+            catch { }
+        }
+
+        // Đọc kho đồ từ file items.json (để người chơi/tester có thể sửa file test)
+        public void LoadItemsJson()
+        {
+            try
+            {
+                string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "items.json");
+                if (!File.Exists(path))
+                {
+                    SaveItemsJson(); // Chưa có file thì tạo file mặc định
+                    return;
+                }
+
+                string[] lines = File.ReadAllLines(path);
+                foreach (var line in lines)
+                {
+                    foreach (var type in ItemsInventory.Keys)
+                    {
+                        if (line.Contains($"\"{type}\""))
+                        {
+                            string[] parts = line.Split(':');
+                            if (parts.Length == 2)
+                            {
+                                string numStr = parts[1].Trim().Trim(',', '}');
+                                if (int.TryParse(numStr, out int count))
+                                {
+                                    ItemsInventory[type].Count = count;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
         }
     }
 }

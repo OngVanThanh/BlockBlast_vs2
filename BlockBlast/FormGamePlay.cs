@@ -1,3 +1,4 @@
+using BlockBlast;
 using BlockBlast.Module;
 using System;
 using System.Collections.Generic;
@@ -16,7 +17,8 @@ namespace BlockBlast
         private readonly GameManager gameManager = new GameManager();
         private readonly TutorialManager tutorialManager = new TutorialManager();
         private readonly Random fxRandom = new Random();
-
+        private Item draggingItem = null; // Theo dõi Item nào đang được kéo
+        private readonly Dictionary<ItemType, Label> itemBadgeLabels = new Dictionary<ItemType, Label>();
         private int[,] draggingShape = null;
         private int draggingColorIndex = 0;
         private Panel activeDockPanel = null;
@@ -39,6 +41,15 @@ namespace BlockBlast
         private bool isGameOver = false;
         private bool isGameInProgress = false; // Cờ theo dõi trạng thái đang chơi dở hay không
 
+        private Point slingAnchor = Point.Empty;     // Điểm neo của ná (tâm slot)
+        private Point slingPullPos = Point.Empty;    // Vị trí chuột đang kéo ná
+        private const int MAX_PULL_DISTANCE = 140;   // Khoảng cách kéo ná tối đa
+        private readonly Timer slingshotTimer;
+        private DateTime tensionMaxStartTime = DateTime.MinValue;
+        private bool isTensionMax = false;
+        private bool isSnapping = false;
+        private Control activeItemSlotCtrl = null;
+
         public fGamePlay()
         {
             InitializeComponent();
@@ -46,6 +57,9 @@ namespace BlockBlast
 
             floatingTextTimer = new Timer { Interval = 16 };
             floatingTextTimer.Tick += FloatingTextTimer_Tick;
+
+            slingshotTimer = new Timer { Interval = 16 };
+            slingshotTimer.Tick += SlingshotTimer_Tick;
         }
 
         // ================================================================
@@ -54,6 +68,7 @@ namespace BlockBlast
 
         private void fGamePlay_Load(object sender, EventArgs e)
         {
+
             gameManager.HighScore = ScoreManager.LoadSavedHighScore();
             sessionGameInitialHighScore = gameManager.HighScore;
 
@@ -77,7 +92,7 @@ namespace BlockBlast
             RegisterEventHandlers();
             ApplyModernTheme();
             UpdateScoreLabels();
-
+            InitItemUI();
             // Hiển thị Menu chính ngay khi mở ứng dụng
             ShowMainMenu();
         }
@@ -325,6 +340,15 @@ namespace BlockBlast
             int boardY = pnlHeader.Height + (availableHeight - pnlBoard.Height) / 2;
             pnlBoard.Location = new Point(boardX, boardY);
 
+            // Tự động căn chỉnh Panel Item bám ngay cạnh phải bàn cờ, cao bằng bàn cờ
+            if (pnlMenuIteam != null)
+            {
+                int panelWidth = 120;
+                pnlMenuIteam.Size = new Size(panelWidth, pnlBoard.Height);
+                pnlMenuIteam.Location = new Point(pnlBoard.Right + 20, pnlBoard.Top);
+                pnlMenuIteam.BringToFront();
+            }
+
             if (lblTutorialGuide != null)
             {
                 lblTutorialGuide.Size = new Size(pnlBoard.Width, 40);
@@ -473,13 +497,19 @@ namespace BlockBlast
         }
 
         private async void fGamePlay_MouseUp(object sender, MouseEventArgs e)
-        {
+        { 
+            if (draggingItem != null)
+            {
+                HandleItemDrop();
+                return;
+            }
             if (draggingShape == null) return;
             if (isGameOver || isProcessingMove || gameManager.IsPaused || e.Button != MouseButtons.Left)
             {
                 CancelDrag();
                 return;
             }
+           
 
             int[,] shapeToPlace = draggingShape;
             int colorToPlace = draggingColorIndex;
@@ -586,6 +616,120 @@ namespace BlockBlast
             if (dragGhost != null && !dragGhost.IsDisposed && dragGhost.Visible) dragGhost.Hide();
         }
 
+        private void InitItemUI()
+        {
+            if (pnlMenuIteam == null) return;
+
+            pnlMenuIteam.Controls.Clear();
+            pnlMenuIteam.BackColor = Color.FromArgb(18, 21, 32);
+
+            // 5 Item mới chuẩn xác 100%
+            var itemConfig = new (ItemType Type, string Icon)[]
+            {
+        (ItemType.RerollDock, "🔄"),
+        (ItemType.Bomb3x3, "💣"),
+        (ItemType.CrossClear, "➕"),
+        (ItemType.ColorLightning, "⚡"),
+        (ItemType.GravityFall, "⬇️")
+            };
+
+            int totalHeight = pnlMenuIteam.Height;
+            int spacing = 8;
+            int slotHeight = Math.Max(50, (totalHeight - (spacing * (itemConfig.Length + 1))) / itemConfig.Length);
+
+            for (int i = 0; i < itemConfig.Length; i++)
+            {
+                var config = itemConfig[i];
+                Item item = gameManager.ItemsInventory[config.Type];
+
+                Panel slot = new Panel
+                {
+                    Size = new Size(pnlMenuIteam.Width - 16, slotHeight),
+                    Location = new Point(8, spacing + i * (slotHeight + spacing)),
+                    BackColor = Color.FromArgb(22, 25, 38),
+                    Tag = item,
+                    Cursor = Cursors.Default
+                };
+
+                Label lblName = new Label
+                {
+                    Text = $"{config.Icon} {item.Name}",
+                    Dock = DockStyle.Top,
+                    Height = slotHeight - 24,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(90, 95, 115),
+                    Tag = item
+                };
+
+                Label lblBadge = new Label
+                {
+                    Text = $"x{item.Count}",
+                    Dock = DockStyle.Bottom,
+                    Height = 22,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(70, 75, 95),
+                    Tag = item
+                };
+
+                slot.Controls.Add(lblName);
+                slot.Controls.Add(lblBadge);
+
+                // Gắn sự kiện chuột
+                slot.MouseDown += ItemSlot_MouseDown;
+                lblName.MouseDown += ItemSlot_MouseDown;
+                lblBadge.MouseDown += ItemSlot_MouseDown;
+
+                slot.MouseMove += ItemSlot_MouseMove;
+                lblName.MouseMove += ItemSlot_MouseMove;
+                lblBadge.MouseMove += ItemSlot_MouseMove;
+
+                slot.MouseUp += ItemSlot_MouseUp;
+                lblName.MouseUp += ItemSlot_MouseUp;
+                lblBadge.MouseUp += ItemSlot_MouseUp;
+
+                pnlMenuIteam.Controls.Add(slot);
+                itemBadgeLabels[config.Type] = lblBadge;
+            }
+
+            UpdateItemUI();
+        }
+
+        private void UpdateItemUI()
+        {
+            foreach (var kvp in itemBadgeLabels)
+            {
+                ItemType type = kvp.Key;
+                Label lblBadge = kvp.Value;
+                if (!gameManager.ItemsInventory.ContainsKey(type)) continue;
+
+                Item item = gameManager.ItemsInventory[type];
+                lblBadge.Text = $"x{item.Count}";
+
+                Panel slot = lblBadge.Parent as Panel;
+                if (slot != null)
+                {
+                    if (item.Count <= 0)
+                    {
+                        // HẾT ITEM -> TẮT PHÁT SÁNG, NỀN TỐI CHÌM, CHUỘT THƯỜNG
+                        slot.BackColor = Color.FromArgb(22, 25, 38);
+                        slot.Cursor = Cursors.Default;
+                        lblBadge.ForeColor = Color.FromArgb(80, 85, 105);
+                        if (slot.Controls.Count > 0) slot.Controls[0].ForeColor = Color.FromArgb(90, 95, 115);
+                    }
+                    else
+                    {
+                        // CÒN ITEM -> NỀN SÁNG VỪA, CHUỘT BÀN TAY
+                        bool isSelected = (draggingItem == item);
+                        slot.BackColor = isSelected ? Color.FromArgb(60, 85, 150) : Color.FromArgb(30, 35, 54);
+                        slot.Cursor = Cursors.Hand;
+                        lblBadge.ForeColor = Color.FromArgb(255, 196, 77);
+                        if (slot.Controls.Count > 0) slot.Controls[0].ForeColor = Color.White;
+                    }
+                }
+            }
+        }
         // ================================================================
         //  6. HOẠT HỌA VÀ HIỆU ỨNG (ANIMATIONS & EFFECTS)
         // ================================================================
@@ -627,29 +771,44 @@ namespace BlockBlast
             flashScale = 1f;
 
             gameManager.AddScore(scoreGained);
+            // Thưởng Item khi ăn Combo n >= 2
+            if (linesCleared >= 2)
+            {
+                Item rewarded = gameManager.AwardComboItem(linesCleared);
+                if (rewarded != null)
+                {
+                    UpdateItemUI(); // Cập nhật số lượng trên giao diện ngay
+                }
+            }
             UpdateScoreLabels();
             pnlBoard.Refresh();
             return true;
         }
 
-        private async Task<bool> ShakeBoardAsync()
+        private async Task<bool> ShakePanelAsync(Control ctrl)
         {
-            Point origin = pnlBoard.Location;
+            if (ctrl == null) return true;
+            Point origin = ctrl.Location;
             try
             {
-                for (int i = 0; i < 3; i++)
+                for (int i = 0; i < 4; i++)
                 {
-                    int dx = fxRandom.Next(3, 6) * (fxRandom.Next(2) == 0 ? -1 : 1);
-                    int dy = fxRandom.Next(3, 6) * (fxRandom.Next(2) == 0 ? -1 : 1);
-                    pnlBoard.Location = new Point(origin.X + dx, origin.Y + dy);
+                    int dx = fxRandom.Next(4, 7) * (fxRandom.Next(2) == 0 ? -1 : 1);
+                    int dy = fxRandom.Next(2, 5) * (fxRandom.Next(2) == 0 ? -1 : 1);
+                    ctrl.Location = new Point(origin.X + dx, origin.Y + dy);
                     if (!await DelayAsync(25)) return false;
                 }
             }
             finally
             {
-                if (!pnlBoard.IsDisposed) pnlBoard.Location = origin;
+                if (!ctrl.IsDisposed) ctrl.Location = origin;
             }
             return true;
+        }
+
+        private async Task<bool> ShakeBoardAsync()
+        {
+            return await ShakePanelAsync(pnlBoard);
         }
 
         private void ShowFloatingText(string text, PointF center)
@@ -725,7 +884,10 @@ namespace BlockBlast
             if (pnlDockPiece2.Tag != null) remainingPieces.Add((BlockPiece)pnlDockPiece2.Tag);
             if (pnlDockPiece3.Tag != null) remainingPieces.Add((BlockPiece)pnlDockPiece3.Tag);
 
-            if (gameManager.CheckGameOver(remainingPieces)) ShowGameOverModal();
+            if (gameManager.CheckGameOverWithItems(remainingPieces))
+            {
+                ShowGameOverModal();
+            }
         }
 
         private void ShowGameOverModal()
@@ -828,12 +990,533 @@ namespace BlockBlast
         {
             floatingTextTimer.Stop();
             floatingTextTimer.Dispose();
+            slingshotTimer.Stop();
+            slingshotTimer.Dispose();
             if (dragGhost != null && !dragGhost.IsDisposed) dragGhost.Dispose();
 
             if (!isGameOver && isGameInProgress)
             {
                 gameManager.SaveGameState(pnlDockPiece1, pnlDockPiece2, pnlDockPiece3);
             }
+        }
+
+        private void ItemSlot_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (isGameOver || isProcessingMove || gameManager.IsPaused) return;
+            if (e.Button != MouseButtons.Left) return;
+
+            Control ctrl = sender as Control;
+            Item item = ctrl?.Tag as Item;
+            if (item == null || item.Count <= 0) return;
+
+            // 1. ĐỔI GẠCH: Bấm phát ăn ngay
+            if (item.Type == ItemType.RerollDock)
+            {
+                item.TryConsume();
+                gameManager.SaveItemsJson();
+                GenerateNewPieces();
+                SoundManager.PlayPickup();
+                ShowFloatingText("🔄 ĐỔI GẠCH!", new PointF(pnlDock.Left + pnlDock.Width / 2, pnlDock.Top + 20));
+                UpdateItemUI();
+                pnlBoard.Invalidate();
+                return;
+            }
+
+            // 2. KÉO NÁ CAO SU VẬT LÝ
+            draggingItem = item;
+            activeItemSlotCtrl = ctrl;
+            slingAnchor = ctrl.PointToScreen(new Point(ctrl.Width / 2, ctrl.Height / 2));
+            slingPullPos = Cursor.Position;
+            ctrl.Capture = true;
+
+            tensionMaxStartTime = DateTime.MinValue;
+            isTensionMax = false;
+            isSnapping = false;
+
+            RenderSlingshotGhost();
+            slingshotTimer.Start();
+            UpdateItemUI();
+        }
+
+        private void ItemSlot_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (draggingItem != null && !isSnapping)
+            {
+                Point mouse = Cursor.Position;
+                int dx = mouse.X - slingAnchor.X;
+                int dy = mouse.Y - slingAnchor.Y;
+                double dist = Math.Sqrt(dx * dx + dy * dy);
+
+                if (dist > MAX_PULL_DISTANCE)
+                {
+                    dx = (int)(dx * MAX_PULL_DISTANCE / dist);
+                    dy = (int)(dy * MAX_PULL_DISTANCE / dist);
+                    dist = MAX_PULL_DISTANCE;
+                }
+
+                slingPullPos = new Point(slingAnchor.X + dx, slingAnchor.Y + dy);
+
+                if (dist >= MAX_PULL_DISTANCE * 0.95)
+                {
+                    if (!isTensionMax)
+                    {
+                        isTensionMax = true;
+                        tensionMaxStartTime = DateTime.Now;
+                    }
+                }
+                else
+                {
+                    isTensionMax = false;
+                    tensionMaxStartTime = DateTime.MinValue;
+                }
+
+                RenderSlingshotGhost();
+            }
+        }
+
+        private void ItemSlot_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (isSnapping) return;
+            slingshotTimer.Stop();
+
+            Control ctrl = sender as Control;
+            if (ctrl != null) ctrl.Capture = false;
+            if (activeItemSlotCtrl != null)
+            {
+                activeItemSlotCtrl.Capture = false;
+                activeItemSlotCtrl = null;
+            }
+
+            if (draggingItem != null)
+            {
+                HandleItemDrop();
+            }
+        }
+
+        private void SlingshotTimer_Tick(object sender, EventArgs e)
+        {
+            if (draggingItem == null || isSnapping) return;
+
+            // Kiểm tra giữ độ căng tối đa quá 1.5 giây -> Đứt dây thun!
+            if (isTensionMax && tensionMaxStartTime != DateTime.MinValue)
+            {
+                double elapsedSec = (DateTime.Now - tensionMaxStartTime).TotalSeconds;
+                if (elapsedSec >= 1.5)
+                {
+                    _ = HandleSlingshotSnapAsync();
+                    return;
+                }
+            }
+
+            RenderSlingshotGhost();
+        }
+
+        // Xử lý sự cố: Dây thun bị đứt do kéo quá căng và giữ quá lâu
+        private async Task HandleSlingshotSnapAsync()
+        {
+            isSnapping = true;
+            slingshotTimer.Stop();
+
+            if (activeItemSlotCtrl != null)
+            {
+                activeItemSlotCtrl.Capture = false;
+                activeItemSlotCtrl = null;
+            }
+
+            Item heldItem = draggingItem;
+            draggingItem = null;
+
+            // 1. Âm thanh PẰNG! đứt dây ná
+            SoundManager.PlaySnap();
+
+            // 2. Hiệu ứng thị giác dây thun đứt giật ngược
+            RenderBrokenSnapGhost();
+            await Task.Delay(180);
+            HideDragGhost();
+
+            // 3. Phạt mất Item:
+            // - Mất item đang cầm trên tay
+            if (heldItem != null)
+            {
+                heldItem.TryConsume();
+            }
+
+            // - Rơi mất thêm 1 item bất kỳ còn tồn kho (quét ưu tiên từ trên xuống dưới)
+            ItemType[] priorityOrder = {
+                ItemType.RerollDock,
+                ItemType.Bomb3x3,
+                ItemType.CrossClear,
+                ItemType.ColorLightning,
+                ItemType.GravityFall
+            };
+
+            Item droppedExtra = null;
+            foreach (var t in priorityOrder)
+            {
+                if (gameManager.ItemsInventory.TryGetValue(t, out var itm) && itm.Count > 0)
+                {
+                    itm.TryConsume();
+                    droppedExtra = itm;
+                    break;
+                }
+            }
+
+            gameManager.SaveItemsJson();
+            UpdateItemUI();
+
+            // 4. Rung chấn Panel Items và hiển thị chữ nổi thông báo
+            if (pnlMenuIteam != null)
+            {
+                string dropText = droppedExtra != null
+                    ? $"💥 ĐỨT DÂY THUN! RƠI {heldItem?.Name} & {droppedExtra.Name}!"
+                    : $"💥 ĐỨT DÂY THUN! MẤT {heldItem?.Name}!";
+                ShowFloatingText(dropText, new PointF(pnlMenuIteam.Left - 50, pnlMenuIteam.Top + pnlMenuIteam.Height / 2));
+                await ShakePanelAsync(pnlMenuIteam);
+            }
+
+            isSnapping = false;
+            isTensionMax = false;
+            tensionMaxStartTime = DateTime.MinValue;
+            CheckGameOver();
+        }
+
+        private async void HandleItemDrop()
+        {
+            if (draggingItem == null || isProcessingMove || isSnapping) return;
+            isProcessingMove = true;
+
+            Item item = draggingItem;
+            draggingItem = null;
+
+            int pullDx = slingPullPos.X - slingAnchor.X;
+            int pullDy = slingPullPos.Y - slingAnchor.Y;
+            double pullDist = Math.Sqrt(pullDx * pullDx + pullDy * pullDy);
+
+            // Kéo nhẹ quá (< 20px) thì coi như hủy bắn, không mất đồ
+            if (pullDist < 20)
+            {
+                HideDragGhost();
+                isProcessingMove = false;
+                UpdateItemUI();
+                pnlBoard.Invalidate();
+                return;
+            }
+
+            // TÍNH TOÁN ĐIỂM RƠI VẬT LÝ (BẮN NGƯỢC CHIỀU KÉO)
+            const double POWER_MULTIPLIER = 4.2;
+            int landScreenX = (int)(slingAnchor.X - pullDx * POWER_MULTIPLIER);
+            int landScreenY = (int)(slingAnchor.Y - pullDy * POWER_MULTIPLIER);
+            Point targetScreen = new Point(landScreenX, landScreenY);
+
+            Point boardPos = pnlBoard.PointToClient(targetScreen);
+            bool isHitBoard = pnlBoard.ClientRectangle.Contains(boardPos);
+
+            // Tiêu hao item & lưu
+            item.TryConsume();
+            gameManager.SaveItemsJson();
+            UpdateItemUI();
+
+            // 1. HOẠT HỌA QUẢ BOM THỰC SỰ BAY QUA MÀN HÌNH THEO ĐƯỜNG CONG PARABOL
+            await FlyProjectileAsync(item, slingPullPos, targetScreen, arcHeight: 70);
+
+            // TRƯỜNG HỢP 1: BẮN TRÚNG BÀN CỜ
+            if (isHitBoard)
+            {
+                int cellSize = BoardRenderer.CalculateCellSize(pnlBoard.Size);
+                int targetCol = (boardPos.X - BoardRenderer.MARGIN) / (cellSize + BoardRenderer.GAP);
+                int targetRow = (boardPos.Y - BoardRenderer.MARGIN) / (cellSize + BoardRenderer.GAP);
+
+                if (targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol < 8)
+                {
+                    flashingCells.Clear();
+                    int clearedCells = 0;
+
+                    switch (item.Type)
+                    {
+                        case ItemType.Bomb3x3:
+                            for (int r = targetRow - 1; r <= targetRow + 1; r++)
+                                for (int c = targetCol - 1; c <= targetCol + 1; c++)
+                                    if (r >= 0 && r < 8 && c >= 0 && c < 8 && gameManager.Board.GetCell(r, c) != 0)
+                                        flashingCells.Add(new Point(c, r));
+
+                            clearedCells = gameManager.Board.ClearArea3x3(targetRow, targetCol);
+                            ShowFloatingText("💥 TRÚNG ĐÍCH! BOM 3X3", BoardRenderer.GetCellRect(targetRow, targetCol, cellSize).Location);
+                            break;
+
+                        case ItemType.CrossClear:
+                            for (int i = 0; i < 8; i++)
+                            {
+                                if (gameManager.Board.GetCell(targetRow, i) != 0) flashingCells.Add(new Point(i, targetRow));
+                                if (gameManager.Board.GetCell(i, targetCol) != 0) flashingCells.Add(new Point(targetCol, i));
+                            }
+                            clearedCells = gameManager.Board.ClearCross(targetRow, targetCol);
+                            ShowFloatingText("⚡ TRÚNG ĐÍCH! CHỮ THẬP", BoardRenderer.GetCellRect(targetRow, targetCol, cellSize).Location);
+                            break;
+
+                        case ItemType.ColorLightning:
+                            int color = gameManager.Board.GetCell(targetRow, targetCol);
+                            if (color > 0)
+                            {
+                                for (int r = 0; r < 8; r++)
+                                    for (int c = 0; c < 8; c++)
+                                        if (gameManager.Board.GetCell(r, c) == color)
+                                            flashingCells.Add(new Point(c, r));
+
+                                clearedCells = gameManager.Board.ClearColor(color);
+                                ShowFloatingText("⚡ SẤM SÉT TRÚNG MÀU!", BoardRenderer.GetCellRect(targetRow, targetCol, cellSize).Location);
+                            }
+                            else
+                            {
+                                ShowFloatingText("⚡ SÉT ĐÁNH VÀO Ô TRỐNG!", BoardRenderer.GetCellRect(targetRow, targetCol, cellSize).Location);
+                            }
+                            break;
+
+                        case ItemType.GravityFall:
+                            gameManager.Board.ApplyGravity();
+                            ShowFloatingText("⬇️ TRỌNG LỰC!", new PointF(pnlBoard.Width / 2, pnlBoard.Height / 2));
+                            break;
+                    }
+
+                    // TÍNH ĐIỂM: 5 điểm cho mỗi ô gạch bị nổ (tương đương 2/5 mức điểm so với xếp gạch)
+                    if (clearedCells > 0)
+                    {
+                        int scoreBonus = clearedCells * 5;
+                        gameManager.AddScore(scoreBonus);
+                        UpdateScoreLabels();
+                    }
+
+                    SoundManager.PlayLineClear(3);
+                    pnlBoard.Refresh();
+                    await ShakeBoardAsync();
+                    flashingCells.Clear();
+
+                    // NẾU LÀ TRỌNG LỰC: KIỂM TRA VÀ TỰ ĐỘNG NỔ CÁC DÒNG ĐẦY VỪA HÌNH THÀNH
+                    if (item.Type == ItemType.GravityFall)
+                    {
+                        await AnimateLineClearAsync();
+                    }
+
+                    pnlBoard.Invalidate();
+                    CheckGameOver();
+                }
+            }
+            // TRƯỜNG HỢP 2: BẮN HỤT (BAY RA NGOÀI MÉP BÀN CỜ)
+            else
+            {
+                PointF failPos = new PointF(Math.Max(10, Math.Min(pnlBoard.Width - 100, boardPos.X)),
+                                            Math.Max(10, Math.Min(pnlBoard.Height - 30, boardPos.Y)));
+                ShowFloatingText("💨 BẮN HỤT RA NGOÀI!", failPos);
+                SoundManager.PlayDrop();
+                CheckGameOver();
+            }
+
+            isProcessingMove = false;
+            pnlBoard.Invalidate();
+            UpdateItemUI();
+        }
+
+        // Vẽ toàn bộ ná cao su, 2 sợi dây thun, quả đạn và chuỗi hạt đạn đạo trên toàn màn hình không bị clip
+        private void RenderSlingshotGhost()
+        {
+            if (draggingItem == null || isSnapping) return;
+
+            Size formSize = this.ClientSize;
+            if (formSize.Width <= 0 || formSize.Height <= 0) return;
+
+            Point formTopLeft = this.PointToScreen(Point.Empty);
+            Point formAnchor = this.PointToClient(slingAnchor);
+            Point formPull = this.PointToClient(slingPullPos);
+
+            // Hiệu ứng rung tay khi kéo quá căng
+            bool flashRed = false;
+            if (isTensionMax && tensionMaxStartTime != DateTime.MinValue)
+            {
+                double elapsed = (DateTime.Now - tensionMaxStartTime).TotalSeconds;
+                flashRed = ((int)(elapsed * 8) % 2 == 0); // Nhấp nháy đỏ 4Hz
+                formPull.X += fxRandom.Next(-2, 3);
+                formPull.Y += fxRandom.Next(-2, 3);
+            }
+
+            using (Bitmap bmp = new Bitmap(formSize.Width, formSize.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+                // 1. Vẽ chạc ná cố định tại slot
+                using (Pen forkPen = new Pen(Color.FromArgb(180, 120, 50), 4f))
+                {
+                    g.DrawLine(forkPen, formAnchor.X, formAnchor.Y - 18, formAnchor.X, formAnchor.Y + 18);
+                }
+
+                // 2. Vẽ 2 sợi dây thun ná cao su co giãn
+                Color bandColor = isTensionMax
+                    ? (flashRed ? Color.FromArgb(255, 45, 45) : Color.FromArgb(255, 180, 50))
+                    : Color.FromArgb(220, 255, 180, 50);
+                float bandWidth = isTensionMax ? 4f : 3f;
+
+                using (Pen bandPen = new Pen(bandColor, bandWidth))
+                {
+                    g.DrawLine(bandPen, formAnchor.X, formAnchor.Y - 14, formPull.X, formPull.Y);
+                    g.DrawLine(bandPen, formAnchor.X, formAnchor.Y + 14, formPull.X, formPull.Y);
+                }
+
+                // 3. Vẽ chuỗi chấm đạn đạo Parabol dài chỉ hướng ngược lại (hướng về bàn cờ)
+                int pullDx = slingPullPos.X - slingAnchor.X;
+                int pullDy = slingPullPos.Y - slingAnchor.Y;
+                double dist = Math.Sqrt(pullDx * pullDx + pullDy * pullDy);
+
+                if (dist > 15)
+                {
+                    const double POWER_MULTIPLIER = 4.2;
+                    Point formTarget = new Point((int)(formAnchor.X - pullDx * POWER_MULTIPLIER),
+                                                 (int)(formAnchor.Y - pullDy * POWER_MULTIPLIER));
+
+                    int dotCount = 14;
+                    for (int i = 1; i <= dotCount; i++)
+                    {
+                        float t = (float)i / dotCount;
+                        float dotX = formPull.X + (formTarget.X - formPull.X) * t;
+                        float dotY = formPull.Y + (formTarget.Y - formPull.Y) * t - (float)(60 * t * (1.0 - t));
+                        float dotRadius = Math.Max(2f, 4.5f - t * 2f);
+
+                        Color dotColor = isTensionMax
+                            ? (flashRed ? Color.FromArgb(255, 255, 50, 50) : Color.FromArgb(230, 255, 180, 0))
+                            : Color.FromArgb((int)(255 * (1f - t * 0.35f)), 255, 215, 0);
+
+                        using (SolidBrush dotBrush = new SolidBrush(dotColor))
+                        {
+                            g.FillEllipse(dotBrush, dotX - dotRadius, dotY - dotRadius, dotRadius * 2, dotRadius * 2);
+                        }
+                    }
+                }
+
+                // 4. Vẽ quầng phát sáng và quả đạn ngay tại đầu tay kéo
+                Color glowColor = isTensionMax ? Color.FromArgb(190, 230, 30, 30) : Color.FromArgb(170, 30, 40, 70);
+                Color borderCol = isTensionMax ? Color.FromArgb(255, 50, 50) : Color.FromArgb(255, 204, 77);
+
+                using (SolidBrush glow = new SolidBrush(glowColor))
+                {
+                    g.FillEllipse(glow, formPull.X - 25, formPull.Y - 25, 50, 50);
+                }
+                using (Pen borderPen = new Pen(borderCol, 2.5f))
+                {
+                    g.DrawEllipse(borderPen, formPull.X - 25, formPull.Y - 25, 50, 50);
+                }
+
+                string icon = draggingItem.Type == ItemType.Bomb3x3 ? "💣" :
+                              draggingItem.Type == ItemType.CrossClear ? "➕" :
+                              draggingItem.Type == ItemType.ColorLightning ? "⚡" : "⬇️";
+
+                using (Font font = new Font("Segoe UI Emoji", 20F))
+                using (SolidBrush textBrush = new SolidBrush(Color.White))
+                {
+                    StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                    g.DrawString(icon, font, textBrush, formPull.X, formPull.Y, sf);
+                }
+
+                // 5. Cảnh báo độ căng tối đa
+                if (isTensionMax && tensionMaxStartTime != DateTime.MinValue)
+                {
+                    double remain = Math.Max(0, 1.5 - (DateTime.Now - tensionMaxStartTime).TotalSeconds);
+                    string warnText = $"⚠️ QUÁ CĂNG! {remain:F1}s";
+                    using (Font warnFont = new Font("Segoe UI", 9.5F, FontStyle.Bold))
+                    using (SolidBrush warnBrush = new SolidBrush(Color.FromArgb(255, 60, 60)))
+                    {
+                        StringFormat sf = new StringFormat { Alignment = StringAlignment.Center };
+                        g.DrawString(warnText, warnFont, warnBrush, formPull.X, formPull.Y - 45, sf);
+                    }
+                }
+
+                if (dragGhost == null || dragGhost.IsDisposed) dragGhost = new DragGhostWindow { Owner = this };
+                dragGhost.SetBitmap(bmp, formTopLeft);
+            }
+
+            if (!dragGhost.Visible) dragGhost.Show();
+        }
+
+        // Vẽ dây thun đứt đôi giật ngược
+        private void RenderBrokenSnapGhost()
+        {
+            Size formSize = this.ClientSize;
+            if (formSize.Width <= 0 || formSize.Height <= 0) return;
+
+            Point formTopLeft = this.PointToScreen(Point.Empty);
+            Point formAnchor = this.PointToClient(slingAnchor);
+            Point formPull = this.PointToClient(slingPullPos);
+            Point mid = new Point((formAnchor.X + formPull.X) / 2, (formAnchor.Y + formPull.Y) / 2);
+
+            using (Bitmap bmp = new Bitmap(formSize.Width, formSize.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+                using (Pen brokenPen = new Pen(Color.FromArgb(255, 50, 50), 3.5f))
+                {
+                    g.DrawLine(brokenPen, formAnchor.X, formAnchor.Y - 14, mid.X - 15, mid.Y - 25);
+                    g.DrawLine(brokenPen, formAnchor.X, formAnchor.Y + 14, mid.X - 15, mid.Y + 25);
+                }
+
+                using (Font f = new Font("Segoe UI", 16F, FontStyle.Bold))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(255, 40, 40)))
+                {
+                    g.DrawString("💥 ĐỨT!", f, b, mid.X, mid.Y - 15);
+                }
+
+                if (dragGhost == null || dragGhost.IsDisposed) dragGhost = new DragGhostWindow { Owner = this };
+                dragGhost.SetBitmap(bmp, formTopLeft);
+            }
+            if (!dragGhost.Visible) dragGhost.Show();
+        }
+
+        // Hoạt họa quả bom thực sự bay theo đường cong Parabol từ ná đến điểm rơi trên bàn cờ
+        private async Task FlyProjectileAsync(Item item, Point startScreen, Point targetScreen, int arcHeight = 70)
+        {
+            if (dragGhost == null || dragGhost.IsDisposed) dragGhost = new DragGhostWindow { Owner = this };
+
+            int pSize = 80;
+            using (Bitmap bombBmp = new Bitmap(pSize, pSize, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+            {
+                using (Graphics g = Graphics.FromImage(bombBmp))
+                {
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    int cx = pSize / 2;
+                    int cy = pSize / 2;
+
+                    using (SolidBrush glow = new SolidBrush(Color.FromArgb(190, 255, 120, 30)))
+                    {
+                        g.FillEllipse(glow, cx - 22, cy - 22, 44, 44);
+                    }
+                    using (Pen borderPen = new Pen(Color.FromArgb(255, 230, 100), 2.5f))
+                    {
+                        g.DrawEllipse(borderPen, cx - 22, cy - 22, 44, 44);
+                    }
+
+                    string icon = item.Type == ItemType.Bomb3x3 ? "💣" :
+                                  item.Type == ItemType.CrossClear ? "➕" :
+                                  item.Type == ItemType.ColorLightning ? "⚡" : "⬇️";
+
+                    using (Font font = new Font("Segoe UI Emoji", 18F))
+                    using (SolidBrush textBrush = new SolidBrush(Color.White))
+                    {
+                        StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                        g.DrawString(icon, font, textBrush, cx, cy, sf);
+                    }
+                }
+
+                const int steps = 15; // 15 khung hình ~ 240ms mượt mà
+                for (int i = 0; i <= steps; i++)
+                {
+                    float t = (float)i / steps;
+                    float curX = startScreen.X + (targetScreen.X - startScreen.X) * t;
+                    float curY = startScreen.Y + (targetScreen.Y - startScreen.Y) * t - (float)(4 * arcHeight * t * (1.0 - t));
+
+                    dragGhost.SetBitmap(bombBmp, new Point((int)curX - pSize / 2, (int)curY - pSize / 2));
+                    if (!dragGhost.Visible) dragGhost.Show();
+                    await Task.Delay(16); // 60 FPS
+                }
+            }
+
+            HideDragGhost();
         }
     }
 }

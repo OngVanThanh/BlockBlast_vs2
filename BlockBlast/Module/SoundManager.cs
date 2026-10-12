@@ -15,6 +15,7 @@ namespace BlockBlast.Module
         private static byte[] wavDrop;
         private static byte[][] wavCombos;
         private static byte[] wavGameOver;
+        private static byte[] wavSnap;
 
         static SoundManager()
         {
@@ -48,12 +49,20 @@ namespace BlockBlast.Module
                     double curFreq = 420 + (180 - 420) * (t / len);
                     return Math.Sin(2 * Math.PI * curFreq * t) * (1 - t / len);
                 }, 0.26f);
+
+                // 5. Snap: Tiếng đứt dây thun "PẰNG" đanh gọn (880Hz -> 160Hz, 50ms)
+                wavSnap = GenerateWavBytes((t, len) =>
+                {
+                    double curFreq = 880 - (880 - 160) * (t / len);
+                    return Math.Sin(2 * Math.PI * curFreq * t) * (1 - t / len);
+                }, 0.05f);
             }
             catch { }
         }
 
         public static void PlayPickup() => PlayBytes(wavPickup);
         public static void PlayDrop() => PlayBytes(wavDrop);
+        public static void PlaySnap() => PlayBytes(wavSnap);
 
         public static void PlayLineClear(int comboLevel)
         {

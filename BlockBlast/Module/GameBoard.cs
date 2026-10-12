@@ -193,5 +193,90 @@ namespace BlockBlast.Module
                 }
             }
         }
+
+        // 1. ITEM 2 (n=3): Nổ vùng vuông 3x3 quanh ô được thả
+        public int ClearArea3x3(int centerRow, int centerCol)
+        {
+            int clearedCount = 0;
+            for (int r = centerRow - 1; r <= centerRow + 1; r++)
+            {
+                for (int c = centerCol - 1; c <= centerCol + 1; c++)
+                {
+                    // Kiểm tra không để tràn ra ngoài mép bàn cờ (0 -> 7)
+                    if (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE)
+                    {
+                        if (grid[r, c] != 0)
+                        {
+                            grid[r, c] = 0; // Xóa ô gạch
+                            clearedCount++;
+                        }
+                    }
+                }
+            }
+            return clearedCount;
+        }
+        // 2. ITEM 3 (n=4): Nổ 1 hàng và 1 cột giao nhau tại (row, col)
+        public int ClearCross(int targetRow, int targetCol)
+        {
+            int clearedCount = 0;
+
+            // Xóa toàn bộ hàng targetRow (từ cột 0 đến 7)
+            if (targetRow >= 0 && targetRow < BOARD_SIZE)
+            {
+                for (int c = 0; c < BOARD_SIZE; c++)
+                {
+                    if (grid[targetRow, c] != 0) { grid[targetRow, c] = 0; clearedCount++; }
+                }
+            }
+
+            // Xóa toàn bộ cột targetCol (từ hàng 0 đến 7)
+            if (targetCol >= 0 && targetCol < BOARD_SIZE)
+            {
+                for (int r = 0; r < BOARD_SIZE; r++)
+                {
+                    if (grid[r, targetCol] != 0) { grid[r, targetCol] = 0; clearedCount++; }
+                }
+            }
+
+            return clearedCount;
+        }
+        // 3. ITEM 4 (n=5): Sấm sét quét sạch tất cả ô có cùng mã màu (targetColor) trên toàn bàn cờ
+        public int ClearColor(int targetColor)
+        {
+            if (targetColor <= 0) return 0;
+            int clearedCount = 0;
+            for (int r = 0; r < BOARD_SIZE; r++)
+            {
+                for (int c = 0; c < BOARD_SIZE; c++)
+                {
+                    if (grid[r, c] == targetColor)
+                    {
+                        grid[r, c] = 0;
+                        clearedCount++;
+                    }
+                }
+            }
+            return clearedCount;
+        }
+        // 4. ITEM 5 (n=6): Dồn các khối gạch ở trên cao rơi tụt xuống dưới đáy
+        public void ApplyGravity()
+        {
+            for (int c = 0; c < BOARD_SIZE; c++)
+            {
+                // Duyệt từng cột từ dưới đáy (hàng 7) ngược lên đỉnh (hàng 0)
+                int writeRow = BOARD_SIZE - 1;
+                for (int r = BOARD_SIZE - 1; r >= 0; r--)
+                {
+                    if (grid[r, c] != 0)
+                    {
+                        int val = grid[r, c];
+                        grid[r, c] = 0;
+                        grid[writeRow, c] = val; // Chuyển gạch xuống vị trí đáy trống
+                        writeRow--;
+                    }
+                }
+            }
+        }
+
     }
 }
