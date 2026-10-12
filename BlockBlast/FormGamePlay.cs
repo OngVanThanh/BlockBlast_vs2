@@ -73,10 +73,6 @@ namespace BlockBlast
             sessionGameInitialHighScore = gameManager.HighScore;
 
             SoundManager.IsMuted = ScoreManager.LoadAudioSettings();
-            if (btnSound != null)
-            {
-                btnSound.Text = SoundManager.IsMuted ? "LOA: TẮT" : "LOA: BẬT";
-            }
 
             if (btnReplay != null && btnReplay.Parent != pnlBoard) pnlBoard.Controls.Add(btnReplay);
             if (btnReplay != null) btnReplay.Visible = false;
@@ -124,27 +120,16 @@ namespace BlockBlast
             pnlDockPiece3.MouseUp += fGamePlay_MouseUp;
 
             // Nút âm thanh trong menu tạm dừng
-            if (btnSound != null)
-            {
-                btnSound.Click += (s, ev) =>
-                {
-                    SoundManager.IsMuted = !SoundManager.IsMuted;
-                    ScoreManager.SaveAudioSettings(SoundManager.IsMuted);
-                    btnSound.Text = SoundManager.IsMuted ? "LOA: TẮT" : "LOA: BẬT";
-                };
-            }
+            if (btnSound != null) btnSound.Click += btnSound_Click;
 
             // Nút mở Menu / Tạm dừng trên header trong game
-            if (btnPause != null)
-            {
-                btnPause.Click += btnOpenMenu_Click;
-            }
-
+            if (btnPause != null) btnPause.Click += btnOpenMenu_Click;
             // Các nút chức năng nằm trong cụm pnlPause (Menu tạm dừng)
+            if (btnNewGameMenu != null) btnNewGameMenu.Click += btnNewGameMenu_Click;
             if (btnResume != null) btnResume.Click += btnResume_Click;
             if (btnRestart != null) btnRestart.Click += btnRestart_Click;
             if (btnExit != null) btnExit.Click += btnExit_Click;
-            if (btnAbout != null) btnAbout.Click += btnAboutInPause_Click; // Nút About trong menu tạm dừng
+            if (btnBackToMenu != null) btnBackToMenu.Click += btnBackToMenu_Click;
 
             // Nút mở Menu chính (nếu có nút Back về Menu chính từ Pause)
             //if (btnBackToMenu != null) btnBackToMenu.Click += (s, e) => ShowMainMenu();
@@ -287,22 +272,6 @@ namespace BlockBlast
             }
         }
 
-        // 5. Nút "About" khi đang trong menu tạm dừng (`pnlPause`)
-        private void btnAboutInPause_Click(object sender, EventArgs e)
-        {
-            if (pnlPause != null) pnlPause.Visible = false;
-            if (pnlAbout != null)
-            {
-                pnlAbout.Parent = this;
-                pnlAbout.Location = new Point(
-                    (this.ClientSize.Width - pnlAbout.Width) / 2,
-                    (this.ClientSize.Height - pnlAbout.Height) / 2
-                );
-                pnlAbout.Visible = true;
-                pnlAbout.BringToFront();
-            }
-        }
-
         // 6. Nút đóng Panel About (`btnCloseAbout`)
         private void btnCloseAbout_Click(object sender, EventArgs e)
         {
@@ -383,7 +352,7 @@ namespace BlockBlast
         private void ApplyModernTheme()
         {
             BoardRenderer.ApplyModernTheme(
-                new Button[] { btnSound, btnResume, btnRestart, btnExit, btnReplay, btnPause, btnAbout, btnCloseAbout },
+                new Button[] { btnSound, btnResume, btnRestart, btnExit, btnReplay, btnPause, btnBackToMenu, btnNewGameMenu, btnCloseAbout },
                 new Panel[] { pnlDockPiece1, pnlDockPiece2, pnlDockPiece3 }
             );
 
@@ -1517,6 +1486,37 @@ namespace BlockBlast
             }
 
             HideDragGhost();
+        }
+
+        private void btnNewGameMenu_Click(object sender, EventArgs e)
+        {
+            if (pnlMainMenu != null) pnlMainMenu.Visible = false;
+            if (pnlBoard != null) pnlBoard.Visible = true;
+            if (pnlDock != null) pnlDock.Visible = true;
+            if (pnlHeader != null) pnlHeader.Visible = true;
+
+            btnRestart_Click(sender, e);
+        }
+
+        private void btnBackToMenu_Click(object sender, EventArgs e)
+        {
+            CancelDrag();
+
+            if (isGameInProgress && !isGameOver)
+            {
+                gameManager.IsPaused = true;
+            }
+
+            floatingTextTimer.Stop();
+
+            ShowMainMenu();
+        }
+
+        private void btnSound_Click(object sender, EventArgs e)
+        {
+            SoundManager.IsMuted = !SoundManager.IsMuted;
+            ScoreManager.SaveAudioSettings(SoundManager.IsMuted);
+            btnSound.Text = SoundManager.IsMuted ? "LOA: TẮT" : "LOA: BẬT";
         }
     }
 }
