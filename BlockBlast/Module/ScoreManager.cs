@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Windows.Forms;
 
 namespace BlockBlast.Module
 {
@@ -82,7 +83,6 @@ namespace BlockBlast.Module
             {
                 var scores = LoadLeaderboardScores();
 
-                // Thêm kết quả mới
                 scores.Add(new LeaderboardEntry
                 {
                     PlayerName = string.IsNullOrWhiteSpace(playerName) ? "Người chơi" : playerName.Trim(),
@@ -90,10 +90,13 @@ namespace BlockBlast.Module
                     Date = DateTime.Now
                 });
 
-                // Sắp xếp giảm dần theo điểm và lấy tối đa 10 dòng cao nhất
                 scores = scores.OrderByDescending(s => s.Score).Take(10).ToList();
 
                 string path = Path.Combine(GetAppDataFolder(), "leaderboard.dat");
+
+                // Đảm bảo thư mục tồn tại
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+
                 using (StreamWriter writer = new StreamWriter(path))
                 {
                     foreach (var entry in scores)
@@ -102,7 +105,11 @@ namespace BlockBlast.Module
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Bật thông báo để kiểm tra nếu đường dẫn bị lỗi quyền ghi
+                MessageBox.Show("Lỗi lưu Leaderboard: " + ex.Message);
+            }
         }
 
         public static List<LeaderboardEntry> LoadLeaderboardScores()
