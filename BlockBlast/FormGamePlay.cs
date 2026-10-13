@@ -239,15 +239,6 @@ namespace BlockBlast
         private void ShowMainMenu()
         {
             CancelDrag();
-            if (pnlBoard != null) pnlBoard.Visible = false;
-            if (pnlDock != null) pnlDock.Visible = false;
-            if (pnlHeader != null) pnlHeader.Visible = false;
-            if (pnlMenuIteam != null) pnlMenuIteam.Visible = false;
-            if (lblTutorialGuide != null) lblTutorialGuide.Visible = false;
-            if (pnlPause != null) pnlPause.Visible = false;
-            if (pnlGameOver != null) pnlGameOver.Visible = false;
-            if (pnlAbout != null) pnlAbout.Visible = false;
-            if (pnlMenuIteam != null) pnlMenuIteam.Visible = false;
 
             if (pnlMainMenu != null)
             {
@@ -268,25 +259,38 @@ namespace BlockBlast
                 if (btnResetHistoryMenu != null) activeButtons.Add(btnResetHistoryMenu);
                 if (btnMenuExit != null) activeButtons.Add(btnMenuExit);
 
-                // 3. Xếp toạ độ Y bắt đầu từ 135 (tránh đè lên Logo BLOCK BLAST và Huy hiệu Kỷ lục)
-                int currentY = 135;
-                int btnWidth = 250;
-                int spacing = 12;
+                int btnWidth = 280; // Tăng chiều rộng nút một chút cho cân đối với màn hình lớn
+                int spacing = 14;
+                int totalHeight = activeButtons.Count * 40 + (activeButtons.Count - 1) * spacing; // Tính tổng chiều cao cụm nút
+
+                // 3. ĐẶT `pnlMainMenu` PHỦ KÍN FULL MÀN HÌNH
+                pnlMainMenu.Parent = this;
+                pnlMainMenu.Location = new Point(0, 0);
+                pnlMainMenu.Size = this.ClientSize; // Khớp kích thước với form
+                pnlMainMenu.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+
+                pnlMainMenu.BackColor = Color.FromArgb(22, 26, 42);
+
+                // Nếu muốn panel full màn hình không bị bo góc (tràn viền tuyệt đối), bạn có thể bỏ dòng ApplyRoundedRegion của pnlMainMenu đi hoặc giữ nguyên tùy ý
+                // BoardRenderer.ApplyRoundedRegion(pnlMainMenu, 20); 
+
+                // 4. Tính toán vị trí bắt đầu theo chiều dọc để toàn bộ cụm nút nằm CHÍNH GIỮA màn hình
+                int startY = (pnlMainMenu.Height - totalHeight) / 2 - 30; // Trừ hao một chút để đẹp mắt nếu có logo phía trên
+                int currentY = startY;
 
                 foreach (Button btn in activeButtons)
                 {
                     btn.Visible = true;
                     int btnHeight = (btn == btnNewGameMenu) ? 44 : 40;
                     btn.Size = new Size(btnWidth, btnHeight);
-                    btn.Location = new Point((380 - btnWidth) / 2, currentY);
+
+                    // Căn giữa theo chiều ngang của màn hình full size
+                    int centerX = (pnlMainMenu.Width - btnWidth) / 2;
+                    btn.Location = new Point(centerX, currentY);
+
                     BoardRenderer.ApplyRoundedRegion(btn, 12);
                     currentY += btnHeight + spacing;
                 }
-
-                // 4. Thiết lập kích thước chuẩn cho Panel Menu và bo góc
-                pnlMainMenu.Size = new Size(380, currentY + 15);
-                pnlMainMenu.BackColor = Color.FromArgb(22, 26, 42);
-                BoardRenderer.ApplyRoundedRegion(pnlMainMenu, 20);
 
                 if (!isMenuPaintRegistered)
                 {
@@ -294,12 +298,7 @@ namespace BlockBlast
                     isMenuPaintRegistered = true;
                 }
 
-                // Căn giữa màn hình và hiển thị
-                pnlMainMenu.Parent = this;
-                pnlMainMenu.Location = new Point(
-                    (this.ClientSize.Width - pnlMainMenu.Width) / 2,
-                    (this.ClientSize.Height - pnlMainMenu.Height) / 2
-                );
+                // Đưa lên lớp trên cùng để che phủ hoàn toàn giao diện game bên dưới
                 pnlMainMenu.Visible = true;
                 pnlMainMenu.BringToFront();
                 pnlMainMenu.Invalidate();
@@ -2265,6 +2264,7 @@ namespace BlockBlast
         {
             CancelDrag();
 
+            if (pnlPause != null) pnlPause.Visible = false;
             if (isGameInProgress && !isGameOver)
             {
                 gameManager.IsPaused = true;
