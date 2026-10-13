@@ -398,16 +398,9 @@ namespace BlockBlast
         // 3. Nút "Thông tin nhóm" trên Menu chính
         private void btnMenuAbout_Click(object sender, EventArgs e)
         {
-            if (pnlMainMenu != null) pnlMainMenu.Visible = false;
-            if (pnlAbout != null)
+            using (FormCredits credits = new FormCredits())
             {
-                pnlAbout.Parent = this;
-                pnlAbout.Location = new Point(
-                    (this.ClientSize.Width - pnlAbout.Width) / 2,
-                    (this.ClientSize.Height - pnlAbout.Height) / 2
-                );
-                pnlAbout.Visible = true;
-                pnlAbout.BringToFront();
+                credits.ShowDialog(this);
             }
         }
 
