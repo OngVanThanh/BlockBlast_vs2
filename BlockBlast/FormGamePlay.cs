@@ -99,13 +99,16 @@ namespace BlockBlast
             InitTutorialLabel();
             InitResetHistoryButtons();
             LayoutGameControls();
-
+  
             this.Resize += (s, ev) => { if (this.WindowState != FormWindowState.Minimized) LayoutGameControls(); };
 
             RegisterEventHandlers();
             ApplyModernTheme();
             UpdateScoreLabels();
             InitItemUI();
+            LoadGameSessionOrTutorial();
+            isGameInProgress = true;
+            isGameOver = false;
             // Hiển thị Menu chính ngay khi mở ứng dụng
             ShowMainMenu();
         }
@@ -201,20 +204,15 @@ namespace BlockBlast
 
         private void LoadGameSessionOrTutorial()
         {
-            // Quy tắc: Nếu BestScore == 0 (tương đương chưa chơi lần nào) -> Bắt buộc kích hoạt Tutorial!
-            // Nếu BestScore > 0 -> Không kích hoạt Tutorial
-            if (gameManager.HighScore == 0)
-            {
-                tutorialManager.ResetTutorial();
-                LoadPuzzleLevel();
-                return;
-            }
-
-            tutorialManager.IsTutorialActive = false;
-            if (lblTutorialGuide != null) lblTutorialGuide.Visible = false;
+            // Kiểm tra xem có file save game cũ hay không, hoặc tutorial đã hoàn thành chưa
+            // Nếu bạn có lưu biến cờ tutorial hoàn thành (ví dụ: tutorialManager.IsTutorialCompleted), hãy dùng nó.
+            // Ở đây ta kết hợp kiểm tra HasSavedGame: nếu có game đang lưu dở thì ưu tiên load game cũ, ngược lại mới xét Tutorial nếu chưa chơi lần nào.
 
             if (gameManager.HasSavedGame && gameManager.LoadGameState(pnlDockPiece1, pnlDockPiece2, pnlDockPiece3))
             {
+                tutorialManager.IsTutorialActive = false;
+                if (lblTutorialGuide != null) lblTutorialGuide.Visible = false;
+
                 isGameInProgress = true;
                 isGameOver = false;
                 UpdateScoreLabels();
@@ -227,12 +225,29 @@ namespace BlockBlast
                 }
                 return;
             }
+
+            // Nếu không có save game cũ mà HighScore == 0 -> Mới chạy Tutorial lần đầu
+            if (gameManager.HighScore == 0)
+            {
+                tutorialManager.ResetTutorial();
+                LoadPuzzleLevel();
+                return;
+            }
+
+            // Trường hợp bình thường không có save nhưng đã có điểm cao -> Sinh gạch mới chơi bình thường
+            tutorialManager.IsTutorialActive = false;
+            if (lblTutorialGuide != null) lblTutorialGuide.Visible = false;
+
+            isGameInProgress = true;
+            isGameOver = false;
             GenerateNewPieces();
         }
 
         // ================================================================
         //  2. QUẢN LÝ GIAO DIỆN & MENU (PANEL NAVIGATION)
         // ================================================================
+
+
 
         private bool isMenuPaintRegistered = false;
 
@@ -352,26 +367,16 @@ namespace BlockBlast
         // 1. Nút "Bắt đầu chơi" trên Menu chính
         private void btnMenuPlay_Click(object sender, EventArgs e)
         {
+
+            // Ẩn menu đi để lộ ra bàn chơi và các block đã được load sẵn ngầm từ Form_Load
             if (pnlMainMenu != null) pnlMainMenu.Visible = false;
 
-            if (pnlBoard != null) pnlBoard.Visible = true;
-            if (pnlDock != null) pnlDock.Visible = true;
-            if (pnlHeader != null) pnlHeader.Visible = true;
-            if (pnlMenuIteam != null) pnlMenuIteam.Visible = true;
+            // Thiết lập trạng thái game
+            gameManager.IsPaused = false;
+            isGameInProgress = true;
+            isGameOver = false;
 
-            // Kiểm tra: Nếu game trước đó vẫn còn dang dở và chưa thua thì tiếp tục, ngược lại tạo mới
-            if (isGameInProgress && !isGameOver)
-            {
-                gameManager.IsPaused = false;
-                if (tutorialManager.IsTutorialActive && lblTutorialGuide != null) lblTutorialGuide.Visible = true;
-                pnlBoard.Invalidate();
-            }
-            else
-            {
-                LoadGameSessionOrTutorial();
-                isGameInProgress = true;
-                isGameOver = false;
-            }
+            UpdateScoreLabels();
         }
 
         // 2. Nút "Bảng xếp hạng" trên Menu chính
@@ -586,16 +591,26 @@ namespace BlockBlast
 
         private void pnlBoard_Paint(object sender, PaintEventArgs e)
         {
-            BoardRenderer.RenderBoard(e.Graphics, pnlBoard.Size, gameManager.Board, draggingShape, draggingColorIndex, hoverRow, hoverCol, flashingCells, flashScale);
-            
-            if (isPlayingItemVfx) RenderItemExplosionVfx(e.Graphics);
+            // Kiểm tra trạng thái từ bộ quản lý game (được load từ file JSON)
+            // Nếu cờ IsNewGame = true và không ở trạng thái game over, bàn cờ sẽ được hiển thị trống
 
-            if (floatingTextAlpha > 0f) BoardRenderer.RenderFloatingText(e.Graphics, floatingComboText, floatingTextPos, floatingTextAlpha);
+            // Vẽ bàn cờ chính và các khối gạch dựa trên dữ liệu hiện tại của gameManager.Board
+            BoardRenderer.RenderBoard(e.Graphics, pnlBoard.Size, gameManager.Board, draggingShape, draggingColorIndex, hoverRow, hoverCol, flashingCells, flashScale);
+            if (isPlayingItemVfx) RenderItemExplosionVfx(e.Graphics);
+            // Vẽ hiệu ứng chữ bay (Combo text) nếu có
+            if (floatingTextAlpha > 0f)
+            {
+                BoardRenderer.RenderFloatingText(e.Graphics, floatingComboText, floatingTextPos, floatingTextAlpha);
+            }
+
+            // Nếu cờ game over kích hoạt, lấy điểm số từ gameManager (đã đồng bộ với JSON) để hiển thị bảng thua
             if (isGameOver)
             {
                 int current = gameManager.CurrentScore;
+                int highScore = gameManager.HighScore; // Lấy điểm cao nhất đã lưu trong GameManager (từ JSON)
                 bool isNewRecord = current > sessionGameInitialHighScore && current > 0;
-                BoardRenderer.RenderGameOverOverlay(e.Graphics, pnlBoard.Size, current, gameManager.HighScore, isNewRecord);
+
+                BoardRenderer.RenderGameOverOverlay(e.Graphics, pnlBoard.Size, current, highScore, isNewRecord);
             }
         }
 
@@ -604,12 +619,23 @@ namespace BlockBlast
             Panel pnl = sender as Panel;
             if (pnl == null || !pnl.Visible) return;
 
+            // Nếu đang là ván mới hoàn toàn (IsNewGame = true) và game đã kết thúc (isGameOver = true) thì không vẽ
+            // (Khi Resume, IsNewGame = false nên điều kiện này sẽ không chặn việc vẽ block cũ)
+            if (gameManager.IsNewGame && isGameOver) return;
+
+            // Nếu ô dock đang được người chơi kéo gạch ra ngoài, hiển thị ô trống
             if (pnl == activeDockPanel && draggingShape != null)
             {
                 BoardRenderer.RenderEmptyDockSlot(e.Graphics, pnl.ClientRectangle);
                 return;
             }
-            BoardRenderer.RenderDockPiece(e.Graphics, pnl);
+
+            // Đảm bảo chỉ vẽ khi Panel thực sự đang chứa BlockPiece trong Tag
+            if (pnl.Tag is BlockPiece piece && piece != null)
+            {
+                // Vẽ hình dáng và màu sắc của khối gạch trong ô dock (đã được khôi phục từ JSON)
+                BoardRenderer.RenderDockPiece(e.Graphics, pnl);
+            }
         }
 
         // ================================================================
@@ -1357,6 +1383,12 @@ namespace BlockBlast
             CancelDrag();
             if (MessageBox.Show("Bạn có chắc chắn muốn thoát game không?", "Xác nhận thoát", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
+                // Cập nhật trạng thái game trước khi thoát
+                gameManager.IsNewGame = false;
+
+                // Nếu bạn có lưu game state tự động, có thể gọi thêm hàm save ở đây nếu cần
+                // gameManager.SaveGameSession();
+
                 Application.Exit();
             }
         }
@@ -1371,9 +1403,11 @@ namespace BlockBlast
 
             if (!isGameOver && isGameInProgress)
             {
-                gameManager.SaveGameState(pnlDockPiece1, pnlDockPiece2, pnlDockPiece3);
+                gameManager.IsNewGame = false;
+                gameManager.SaveGameState(pnlDockPiece1, pnlDockPiece2, pnlDockPiece3, false);
             }
         }
+
 
         private void ItemSlot_MouseDown(object sender, MouseEventArgs e)
         {
@@ -2269,7 +2303,7 @@ namespace BlockBlast
             {
                 gameManager.IsPaused = true;
                 // Lưu ván chơi ngay khi thoát ra Menu chính
-                gameManager.SaveGameState(pnlDockPiece1, pnlDockPiece2, pnlDockPiece3);
+                gameManager.SaveGameState(pnlDockPiece1, pnlDockPiece2, pnlDockPiece3, false);
             }
 
             floatingTextTimer.Stop();

@@ -12,7 +12,9 @@ namespace BlockBlast
     public class GameSaveModel
     {
         public int CurrentScore { get; set; }
-        public int[][] BoardMatrix { get; set; } // A[i][j] = 1 (có block), 0 (trống)
+        public int HighScore { get; set; }
+        public bool IsNewGame { get; set; } // true: ván mới hoàn toàn -> ẩn nút Tiếp tục; false: đang chơi dở -> hiện nút Tiếp tục
+        public int[][] BoardMatrix { get; set; }
         public List<DockPieceModel> DockPieces { get; set; }
     }
 
@@ -25,10 +27,16 @@ namespace BlockBlast
 
     public class GameManager
     {
+        // === Các biến toàn cục / thuộc tính quản lý trạng thái game ===
         public GameBoard Board { get; private set; }
         public int CurrentScore { get; private set; }
         public int HighScore { get; set; }
         public bool IsPaused { get; set; }
+        public bool IsNewGame { get; set; } = true;
+
+        // Bộ đệm trạng thái lưu trữ bàn cờ và dock
+        public int[][] SavedBoardMatrix { get; set; }
+        public List<DockPieceModel> SavedDockPieces { get; set; }
 
         // === Kho chứa 5 loại Item ===
         public Dictionary<ItemType, Item> ItemsInventory { get; private set; }
@@ -342,62 +350,108 @@ namespace BlockBlast
             }
             catch { }
         }
-        public void SaveGameState(Panel pnl1, Panel pnl2, Panel pnl3)
+        public void SaveGameState(Panel pnl1, Panel pnl2, Panel pnl3, bool isGameOver)
         {
             try
             {
-                int[,] boardGrid = Board.GetGrid();
-                int[][] boardMatrix = new int[BOARD_SIZE][];
-                for (int r = 0; r < BOARD_SIZE; r++)
+                // === BƯỚC 1: CẬP NHẬT TRẠNG THÁI VÀO CÁC BIẾN TOÀN CỤC ===
+                if (isGameOver)
                 {
-                    boardMatrix[r] = new int[BOARD_SIZE];
-                    for (int c = 0; c < BOARD_SIZE; c++)
-                    {
-                        boardMatrix[r][c] = boardGrid[r, c]; // A[i][j]
-                    }
-                }
+                    // Trường hợp Game Over: Reset trạng thái
+                    this.IsNewGame = true;
+                    this.CurrentScore = 0; // Reset điểm hiện tại về 0
 
-                var dockList = new List<DockPieceModel>();
-                Panel[] panels = { pnl1, pnl2, pnl3 };
-                foreach (var p in panels)
-                {
-                    var model = new DockPieceModel();
-                    if (p != null && p.Tag is BlockPiece piece && piece.Shape != null)
+                    // Tạo ma trận bàn cờ toàn số 0 (Trống) cho biến toàn cục
+                    SavedBoardMatrix = new int[BOARD_SIZE][];
+                    for (int r = 0; r < BOARD_SIZE; r++)
                     {
-                        model.IsVisible = true;
-                        model.ColorIndex = piece.ColorIndex;
-                        int rows = piece.Shape.GetLength(0);
-                        int cols = piece.Shape.GetLength(1);
-                        model.ShapeMatrix = new int[rows][];
-                        for (int r = 0; r < rows; r++)
+                        SavedBoardMatrix[r] = new int[BOARD_SIZE];
+                        for (int c = 0; c < BOARD_SIZE; c++)
                         {
-                            model.ShapeMatrix[r] = new int[cols];
-                            for (int c = 0; c < cols; c++)
-                            {
-                                model.ShapeMatrix[r][c] = piece.Shape[r, c];
-                            }
+                            SavedBoardMatrix[r][c] = 0;
                         }
                     }
-                    else
+
+                    // Xóa sạch 3 ô Dock cho biến toàn cục
+                    SavedDockPieces = new List<DockPieceModel>();
+                    for (int i = 0; i < 3; i++)
                     {
-                        model.IsVisible = false;
-                        model.ColorIndex = 0;
-                        model.ShapeMatrix = new int[0][];
+                        SavedDockPieces.Add(new DockPieceModel
+                        {
+                            IsVisible = false,
+                            ColorIndex = 1,
+                            ShapeMatrix = new int[0][]
+                        });
                     }
-                    dockList.Add(model);
+                }
+                else
+                {
+                    // Trường hợp Thoát giữa chừng / Về Menu: Giữ nguyên trạng thái chơi dở
+                    this.IsNewGame = false;
+                    // CurrentScore đã được cập nhật liên tục trong quá trình chơi
+
+                    // Lưu ma trận bàn cờ hiện tại vào biến toàn cục SavedBoardMatrix
+                    int[,] grid = GetGameBoardMatrix(this.Board);
+                    SavedBoardMatrix = new int[BOARD_SIZE][];
+                    for (int r = 0; r < BOARD_SIZE; r++)
+                    {
+                        SavedBoardMatrix[r] = new int[BOARD_SIZE];
+                        for (int c = 0; c < BOARD_SIZE; c++)
+                        {
+                            SavedBoardMatrix[r][c] = grid[r, c];
+                        }
+                    }
+
+                    // Lưu trạng thái 3 ô Dock hiện tại vào biến toàn cục SavedDockPieces
+                    SavedDockPieces = new List<DockPieceModel>();
+                    Panel[] panels = { pnl1, pnl2, pnl3 };
+                    foreach (var panel in panels)
+                    {
+                        var dockModel = new DockPieceModel();
+                        if (panel != null && panel.Visible && panel.Tag is BlockPiece piece)
+                        {
+                            dockModel.IsVisible = true;
+                            dockModel.ColorIndex = piece.ColorIndex;
+                            int[,] shape = piece.Shape;
+                            int rows = shape.GetLength(0);
+                            int cols = shape.GetLength(1);
+                            dockModel.ShapeMatrix = new int[rows][];
+                            for (int r = 0; r < rows; r++)
+                            {
+                                dockModel.ShapeMatrix[r] = new int[cols];
+                                for (int c = 0; c < cols; c++)
+                                {
+                                    dockModel.ShapeMatrix[r][c] = shape[r, c];
+                                }
+                            }
+                        }
+                        else
+                        {
+                            dockModel.IsVisible = false;
+                            dockModel.ColorIndex = 1;
+                            dockModel.ShapeMatrix = new int[0][];
+                        }
+                        SavedDockPieces.Add(dockModel);
+                    }
                 }
 
-                var saveData = new GameSaveModel
-                {
-                    CurrentScore = CurrentScore,
-                    BoardMatrix = boardMatrix,
-                    DockPieces = dockList
-                };
+                // === BƯỚC 2: DỰA TRÊN CÁC BIẾN TOÀN CỤC ĐỂ LƯU VÀO FILE STATE GAME ===
+                var model = new GameSaveModel();
+                model.HighScore = this.HighScore;
+                model.CurrentScore = this.CurrentScore;
+                model.IsNewGame = this.IsNewGame;
+                model.BoardMatrix = SavedBoardMatrix;
+                model.DockPieces = SavedDockPieces;
 
-                string jsonString = SimpleJsonSerialize(saveData);
-                File.WriteAllText(GetSaveGameFilePath(), jsonString);
+                // Ghi xuống file gamestate.json
+                string path = GetSaveGameFilePath();
+                string jsonString = SimpleJsonSerialize(model);
+                File.WriteAllText(path, jsonString);
             }
-            catch { }
+            catch
+            {
+                // Bắt lỗi ngầm tránh crash ứng dụng
+            }
         }
 
         public bool LoadGameState(Panel pnl1, Panel pnl2, Panel pnl3)
@@ -408,51 +462,90 @@ namespace BlockBlast
                 if (!File.Exists(path)) return false;
 
                 string jsonString = File.ReadAllText(path);
-                var saveData = SimpleJsonDeserialize(jsonString);
-                if (saveData == null) return false;
+                var model = SimpleJsonDeserialize(jsonString);
+                if (model == null) return false;
 
-                this.CurrentScore = saveData.CurrentScore;
+                // === BƯỚC 1: LƯU DỮ LIỆU ĐỌC ĐƯỢC VÀO CÁC BIẾN TOÀN CỤC ===
+                this.CurrentScore = model.CurrentScore;
+                this.HighScore = model.HighScore;
+                this.IsNewGame = model.IsNewGame;
 
-                int[,] newGrid = new int[BOARD_SIZE, BOARD_SIZE];
-                for (int r = 0; r < BOARD_SIZE && r < saveData.BoardMatrix.Length; r++)
+                // Nếu là game mới hoặc dữ liệu trống thì không load bàn cờ/dock
+                if (this.IsNewGame) return false;
+
+                // Lưu ma trận bàn cờ vào biến toàn cục SavedBoardMatrix
+                if (model.BoardMatrix != null)
                 {
-                    for (int c = 0; c < BOARD_SIZE && c < saveData.BoardMatrix[r].Length; c++)
-                    {
-                        newGrid[r, c] = saveData.BoardMatrix[r][c];
-                    }
-                }
-                this.Board.SetGrid(newGrid);
+                    int rows = model.BoardMatrix.Length;
+                    SavedBoardMatrix = new int[rows][];
+                    int[,] grid = new int[rows, rows > 0 ? model.BoardMatrix[0].Length : BOARD_SIZE];
 
-                Panel[] panels = { pnl1, pnl2, pnl3 };
-                for (int i = 0; i < panels.Length && i < saveData.DockPieces.Count; i++)
-                {
-                    var model = saveData.DockPieces[i];
-                    if (model.IsVisible && model.ShapeMatrix != null && model.ShapeMatrix.Length > 0)
+                    for (int r = 0; r < rows; r++)
                     {
-                        int rows = model.ShapeMatrix.Length;
-                        int cols = model.ShapeMatrix[0].Length;
-                        int[,] shape = new int[rows, cols];
-                        for (int r = 0; r < rows; r++)
+                        int cols = model.BoardMatrix[r].Length;
+                        SavedBoardMatrix[r] = new int[cols];
+                        for (int c = 0; c < cols; c++)
                         {
-                            for (int c = 0; c < cols; c++)
+                            SavedBoardMatrix[r][c] = model.BoardMatrix[r][c];
+                            if (r < BOARD_SIZE && c < BOARD_SIZE)
                             {
-                                shape[r, c] = model.ShapeMatrix[r][c];
+                                grid[r, c] = model.BoardMatrix[r][c];
                             }
                         }
-                        panels[i].Tag = new BlockPiece(shape, model.ColorIndex);
-                        panels[i].Visible = true;
                     }
-                    else
+
+                    // Đưa ma trận vào đối tượng Board hiện tại
+                    if (this.Board != null && this.Board.GetType().GetMethod("SetGrid") != null)
                     {
-                        panels[i].Tag = null;
-                        panels[i].Visible = true;
+                        this.Board.GetType().GetMethod("SetGrid").Invoke(this.Board, new object[] { grid });
                     }
-                    panels[i].Invalidate();
+                }
+
+                // Lưu trạng thái 3 ô dock vào biến toàn cục SavedDockPieces và khôi phục giao diện
+                SavedDockPieces = new List<DockPieceModel>();
+                Panel[] panels = { pnl1, pnl2, pnl3 };
+
+                for (int i = 0; i < panels.Length && i < model.DockPieces.Count; i++)
+                {
+                    var panel = panels[i];
+                    var dockModel = model.DockPieces[i];
+
+                    // Lưu bản sao vào biến toàn cục
+                    SavedDockPieces.Add(dockModel);
+
+                    if (panel != null)
+                    {
+                        if (dockModel.IsVisible && dockModel.ShapeMatrix != null && dockModel.ShapeMatrix.Length > 0)
+                        {
+                            int sRows = dockModel.ShapeMatrix.Length;
+                            int sCols = sRows > 0 ? dockModel.ShapeMatrix[0].Length : 0;
+                            int[,] shape2D = new int[sRows, sCols];
+
+                            for (int r = 0; r < sRows; r++)
+                            {
+                                for (int c = 0; c < dockModel.ShapeMatrix[r].Length && c < sCols; c++)
+                                {
+                                    shape2D[r, c] = dockModel.ShapeMatrix[r][c];
+                                }
+                            }
+
+                            BlockPiece piece = new BlockPiece(shape2D, dockModel.ColorIndex);
+                            panel.Tag = piece;
+                            panel.Visible = true;
+                            panel.Invalidate();
+                        }
+                        else
+                        {
+                            panel.Tag = null;
+                            panel.Visible = false;
+                            panel.Invalidate();
+                        }
+                    }
                 }
 
                 return true;
             }
-                                                                                                                catch
+            catch
             {
                 return false;
             }
@@ -461,12 +554,23 @@ namespace BlockBlast
         // ================================================================
         //  3. ĐỊNH DẠNG JSON CHUẨN ĐẸP (FORMATTED JSON SERIALIZE)
         // ================================================================
-
+        private int[,] GetGameBoardMatrix(GameBoard board)
+        {
+            if (board != null)
+            {
+                // Nếu lớp Board của bạn dùng hàm lấy mảng là GetGrid() hoặc thuộc tính Grid, 
+                // hãy chắc chắn tên gọi khớp với code Board hiện tại của bạn.
+                return board.GetGrid();
+            }
+            return new int[BOARD_SIZE, BOARD_SIZE];
+        }
         private string SimpleJsonSerialize(GameSaveModel data)
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("{");
             sb.AppendLine($"  \"CurrentScore\": {data.CurrentScore},");
+            sb.AppendLine($"  \"HighScore\": {data.HighScore},");
+            sb.AppendLine($"  \"IsNewGame\": {data.IsNewGame.ToString().ToLower()},");
 
             sb.AppendLine("  \"BoardMatrix\": [");
             for (int r = 0; r < data.BoardMatrix.Length; r++)
@@ -508,20 +612,44 @@ namespace BlockBlast
             return sb.ToString();
         }
 
-        private GameSaveModel SimpleJsonDeserialize(string json)
+        public GameSaveModel SimpleJsonDeserialize(string json)
         {
             try
             {
                 var model = new GameSaveModel();
+
                 int scoreIdx = json.IndexOf("CurrentScore");
                 if (scoreIdx != -1)
                 {
                     int colon = json.IndexOf(':', scoreIdx);
                     int comma = json.IndexOf(',', colon);
                     if (comma == -1) comma = json.IndexOf('}', colon);
-                    string scoreStr = json.Substring(colon + 1, comma - colon - 1).Trim();
-                    int.TryParse(scoreStr, out int sc);
+                    int.TryParse(json.Substring(colon + 1, comma - colon - 1).Trim(), out int sc);
                     model.CurrentScore = sc;
+                }
+
+                int hsIdx = json.IndexOf("HighScore");
+                if (hsIdx != -1)
+                {
+                    int colon = json.IndexOf(':', hsIdx);
+                    int comma = json.IndexOf(',', colon);
+                    if (comma == -1) comma = json.IndexOf('}', colon);
+                    int.TryParse(json.Substring(colon + 1, comma - colon - 1).Trim(), out int hs);
+                    model.HighScore = hs;
+                }
+
+                int newGameIdx = json.IndexOf("IsNewGame");
+                if (newGameIdx != -1)
+                {
+                    int colon = json.IndexOf(':', newGameIdx);
+                    int comma = json.IndexOf(',', colon);
+                    if (comma == -1) comma = json.IndexOf('}', colon);
+                    bool.TryParse(json.Substring(colon + 1, comma - colon - 1).Trim(), out bool isNew);
+                    model.IsNewGame = isNew;
+                }
+                else
+                {
+                    model.IsNewGame = true;
                 }
 
                 model.BoardMatrix = new int[BOARD_SIZE][];
@@ -548,10 +676,8 @@ namespace BlockBlast
                             string[] nums = rowVals.Split(',');
                             for (int c = 0; c < BOARD_SIZE && c < nums.Length; c++)
                             {
-                                if (int.TryParse(nums[c].Trim(), out int val))
-                                {
-                                    model.BoardMatrix[r][c] = val; // A[i][j]
-                                }
+                                int.TryParse(nums[c].Trim(), out int val);
+                                model.BoardMatrix[r][c] = val;
                             }
                             idx = rowEnd + 1;
                             r++;
@@ -563,91 +689,86 @@ namespace BlockBlast
                 int dockKey = json.IndexOf("DockPieces");
                 if (dockKey != -1)
                 {
-                    int startBracket = json.IndexOf('[', dockKey);
-                    int endBracket = FindMatchingCloseBracket(json, startBracket);
-                    if (startBracket != -1 && endBracket != -1)
+                    int dockStart = json.IndexOf('[', dockKey);
+                    int dockEnd = FindMatchingCloseBracket(json, dockStart);
+                    if (dockStart != -1 && dockEnd != -1)
                     {
-                        string dockContent = json.Substring(startBracket + 1, endBracket - startBracket - 1);
+                        string dockContent = json.Substring(dockStart + 1, dockEnd - dockStart - 1);
                         int searchIdx = 0;
-                        while (searchIdx < dockContent.Length)
+                        while (true)
                         {
                             int objStart = dockContent.IndexOf('{', searchIdx);
                             if (objStart == -1) break;
-                            int objEnd = dockContent.IndexOf('}', objStart);
+                            int objEnd = FindMatchingCloseBracket(dockContent, objStart);
                             if (objEnd == -1) break;
 
                             string objStr = dockContent.Substring(objStart + 1, objEnd - objStart - 1);
-                            var dockItem = new DockPieceModel();
+                            var dockModel = new DockPieceModel();
 
-                            // 1. Đọc trạng thái IsVisible
-                            int visIdx = objStr.IndexOf("IsVisible");
-                            if (visIdx != -1)
+                            dockModel.IsVisible = objStr.Contains("\"IsVisible\": true");
+
+                            int colorKey = objStr.IndexOf("ColorIndex");
+                            if (colorKey != -1)
                             {
-                                int colon = objStr.IndexOf(':', visIdx);
-                                int comma = objStr.IndexOfAny(new char[] { ',', '\r', '\n' }, colon);
-                                string val = (comma != -1 ? objStr.Substring(colon + 1, comma - colon - 1) : objStr.Substring(colon + 1)).Trim();
-                                dockItem.IsVisible = val.ToLower().Contains("true");
+                                int cColon = objStr.IndexOf(':', colorKey);
+                                int cComma = objStr.IndexOf(',', cColon);
+                                if (cComma == -1) cComma = objStr.Length;
+                                int.TryParse(objStr.Substring(cColon + 1, cComma - cColon - 1).Trim(), out int colIdx);
+                                dockModel.ColorIndex = colIdx;
                             }
 
-                            // 2. Đọc mã màu ColorIndex
-                            int colIdx = objStr.IndexOf("ColorIndex");
-                            if (colIdx != -1)
+                            int shapeKey = objStr.IndexOf("ShapeMatrix");
+                            if (shapeKey != -1)
                             {
-                                int colon = objStr.IndexOf(':', colIdx);
-                                int comma = objStr.IndexOfAny(new char[] { ',', '\r', '\n' }, colon);
-                                string val = (comma != -1 ? objStr.Substring(colon + 1, comma - colon - 1) : objStr.Substring(colon + 1)).Trim();
-                                int cVal = 0;
-                                int.TryParse(val, out cVal);
-                                dockItem.ColorIndex = cVal;
-                            }
-
-                            // 3. Đọc ma trận hình dáng ShapeMatrix
-                            int shapeIdx = objStr.IndexOf("ShapeMatrix");
-                            if (shapeIdx != -1)
-                            {
-                                int sOpen = objStr.IndexOf('[', shapeIdx);
-                                int sClose = FindMatchingCloseBracket(objStr, sOpen);
-                                if (sOpen != -1 && sClose != -1)
+                                int sStart = objStr.IndexOf('[', shapeKey);
+                                int sEnd = FindMatchingCloseBracket(objStr, sStart);
+                                if (sStart != -1 && sEnd != -1)
                                 {
-                                    string shapeContent = objStr.Substring(sOpen + 1, sClose - sOpen - 1).Trim();
+                                    string shapeMatrixStr = objStr.Substring(sStart + 1, sEnd - sStart - 1).Trim();
                                     List<int[]> rowsList = new List<int[]>();
                                     int rIdx = 0;
-                                    while (rIdx < shapeContent.Length)
+                                    while (true)
                                     {
-                                        int rStart = shapeContent.IndexOf('[', rIdx);
-                                        if (rStart == -1) break;
-                                        int rEnd = shapeContent.IndexOf(']', rStart);
-                                        if (rEnd == -1) break;
+                                        int rStart = shapeMatrixStr.IndexOf('[', rIdx);
+                                        if (rStart == -1 || rStart > sEnd) break;
+                                        int rEndActual = shapeMatrixStr.IndexOf(']', rStart);
+                                        if (rEndActual == -1) break;
 
-                                        string rowVals = shapeContent.Substring(rStart + 1, rEnd - rStart - 1).Trim();
-                                        if (!string.IsNullOrEmpty(rowVals))
+                                        string rVals = shapeMatrixStr.Substring(rStart + 1, rEndActual - rStart - 1);
+                                        string[] rNums = rVals.Split(',');
+                                        List<int> rowValues = new List<int>();
+                                        foreach (var num in rNums)
                                         {
-                                            string[] nums = rowVals.Split(',');
-                                            int[] rowArr = new int[nums.Length];
-                                            for (int n = 0; n < nums.Length; n++)
-                                            {
-                                                int nVal = 0;
-                                                int.TryParse(nums[n].Trim(), out nVal);
-                                                rowArr[n] = nVal;
-                                            }
-                                            rowsList.Add(rowArr);
+                                            if (int.TryParse(num.Trim(), out int nVal))
+                                                rowValues.Add(nVal);
                                         }
-                                        rIdx = rEnd + 1;
+                                        if (rowValues.Count > 0) rowsList.Add(rowValues.ToArray());
+                                        rIdx = rEndActual + 1;
                                     }
-                                    dockItem.ShapeMatrix = rowsList.ToArray();
+
+                                    if (rowsList.Count > 0)
+                                    {
+                                        int totalRows = rowsList.Count;
+                                        int[][] finalShape = new int[totalRows][];
+                                        for (int ri = 0; ri < totalRows; ri++) finalShape[ri] = rowsList[ri];
+                                        dockModel.ShapeMatrix = finalShape;
+                                    }
+                                    else
+                                    {
+                                        dockModel.ShapeMatrix = new int[0][];
+                                    }
                                 }
                             }
 
-                            model.DockPieces.Add(dockItem);
+                            model.DockPieces.Add(dockModel);
                             searchIdx = objEnd + 1;
                         }
                     }
                 }
 
-                // Dự phòng nếu danh sách thiếu ô
                 while (model.DockPieces.Count < 3)
                 {
-                    model.DockPieces.Add(new DockPieceModel { IsVisible = false, ColorIndex = 0, ShapeMatrix = new int[0][] });
+                    model.DockPieces.Add(new DockPieceModel { IsVisible = false, ColorIndex = 1, ShapeMatrix = new int[0][] });
                 }
 
                 return model;
