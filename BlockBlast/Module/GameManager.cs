@@ -213,7 +213,7 @@ namespace BlockBlast
             // Giảm dần số lần thử "cứu trợ" theo mức điểm
             int samplePoolSize = CurrentScore < 1500 ? 60 :
                                  CurrentScore < 3000 ? 30 :
-                                 CurrentScore < 5000 ? 10 : 5;
+                                 CurrentScore < 5000 ? 10 : 1;
 
             int[][] possibleOrders = new int[][]
             {
