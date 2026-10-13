@@ -94,6 +94,7 @@ namespace BlockBlast
             if (pnlGameOver != null) pnlGameOver.Visible = false;
             if (pnlPause != null) pnlPause.Visible = false;
             if (pnlAbout != null) pnlAbout.Visible = false;
+            if (pnlMenuIteam != null) pnlMenuIteam.Visible = true;
 
             InitTutorialLabel();
             InitResetHistoryButtons();
@@ -246,6 +247,7 @@ namespace BlockBlast
             if (pnlPause != null) pnlPause.Visible = false;
             if (pnlGameOver != null) pnlGameOver.Visible = false;
             if (pnlAbout != null) pnlAbout.Visible = false;
+            if (pnlMenuIteam != null) pnlMenuIteam.Visible = false;
 
             if (pnlMainMenu != null)
             {
