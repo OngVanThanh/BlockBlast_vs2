@@ -62,37 +62,37 @@ namespace BlockBlast
         private static readonly int[] EasyShapeIndices = { 0, 1, 2, 3, 4, 11, 12, 13, 14 };
         // - Nhóm 2 (Vừa - 4 ô): 1x4, 4x1, vuông 2x2, chữ T, chữ Z/S
         private static readonly int[] MediumShapeIndices = { 5, 6, 9, 19, 20, 21, 22, 23, 24, 25, 26 };
-        // - Nhóm 3 (Khó/Hiểm - 5 đến 9 ô): 1x5, 5x1, vuông đại 3x3, chữ L đại 3x3
         private static readonly int[] HardShapeIndices = { 7, 8, 10, 15, 16, 17, 18 };
+        // - Nhóm 3 (Khó/Hiểm - 5 đến 9 ô): 1x5, 5x1, vuông đại 3x3, chữ L đại 3x3
 
         private int GetWeightedShapeIndex(int score)
         {
             double roll = rand.NextDouble();
 
-            if (score < 500)
+            if (score < 1500)
             {
-                // Dưới 500đ: 60% Dễ - 30% Vừa - 10% Khó
+                // Dưới 1500đ: 60% Dễ - 30% Vừa - 10% Khó
                 if (roll < 0.60) return GetRandomShapeFromCategory(1);
                 if (roll < 0.90) return GetRandomShapeFromCategory(2);
                 return GetRandomShapeFromCategory(3);
             }
-            else if (score < 1500)
+            else if (score < 3000)
             {
-                // 500 - 1500đ: 35% Dễ - 45% Vừa - 20% Khó
+                // 1500 - 3000đ: 35% Dễ - 45% Vừa - 20% Khó
                 if (roll < 0.35) return GetRandomShapeFromCategory(1);
                 if (roll < 0.80) return GetRandomShapeFromCategory(2);
                 return GetRandomShapeFromCategory(3);
             }
-            else if (score < 3000)
+            else if (score < 5000)
             {
-                // 1500 - 3000đ: 15% Dễ - 45% Vừa - 40% Khó
+                // 3000 - 5000đ: 15% Dễ - 45% Vừa - 40% Khó
                 if (roll < 0.15) return GetRandomShapeFromCategory(1);
                 if (roll < 0.60) return GetRandomShapeFromCategory(2);
                 return GetRandomShapeFromCategory(3);
             }
             else
             {
-                // Trên 3000đ: 5% Dễ - 35% Vừa - 60% Khó (Ép dùng Item hoặc thua nếu xếp bừa)
+                // Trên 5000đ: 5% Dễ - 35% Vừa - 60% Khó (Ép dùng Item hoặc thua nếu xếp bừa)
                 if (roll < 0.05) return GetRandomShapeFromCategory(1);
                 if (roll < 0.40) return GetRandomShapeFromCategory(2);
                 return GetRandomShapeFromCategory(3);
@@ -210,10 +210,10 @@ namespace BlockBlast
         {
             List<List<BlockPiece>> validCombinations = new List<List<BlockPiece>>();
 
-            // Giảm dần số lần thử "cứu trợ" theo mức điểm; từ 3000đ trở lên tắt hẳn cứu trợ (samplePoolSize = 0)
-            int samplePoolSize = CurrentScore < 500 ? 30 :
-                                 CurrentScore < 1500 ? 10 :
-                                 CurrentScore < 3000 ? 4 : 0;
+            // Giảm dần số lần thử "cứu trợ" theo mức điểm
+            int samplePoolSize = CurrentScore < 1500 ? 60 :
+                                 CurrentScore < 3000 ? 30 :
+                                 CurrentScore < 5000 ? 10 : 5;
 
             int[][] possibleOrders = new int[][]
             {
@@ -738,10 +738,144 @@ namespace BlockBlast
             return rewarded;
         }
 
-        // Sinh 1 viên gạch mới ưu tiên đặt vừa bàn cờ cho Item Đổi Gạch (lấp vào 1 khay trống)
+        // Thuật toán tìm khối gạch tối ưu nhất cho bàn cờ hiện tại:
+        // 1. Khối làm nổ được nhiều hàng/cột nhất có thể (Line Clear)
+        // 2. Khối lấp vào các hàng/cột sắp đầy (7/8 ô)
+        // 3. Khối nhỏ gọn (1x1, 1x2, 2x1) dễ đặt, giải tỏa diện tích bàn cờ
         public BlockPiece CreatePieceForEmptySlot()
         {
-            return CreateRandomPiece();
+            int[,] currentGrid = Board.GetGrid();
+            int bestScore = -1;
+            int[,] bestShape = null;
+
+            // Quét qua tất cả các hình dạng chuẩn trong game
+            foreach (var shape in BlockPiece.AllShapes)
+            {
+                int rows = shape.GetLength(0);
+                int cols = shape.GetLength(1);
+
+                int cellCount = 0;
+                for (int r = 0; r < rows; r++)
+                    for (int c = 0; c < cols; c++)
+                        if (shape[r, c] != 0) cellCount++;
+
+                // Thử tất cả vị trí đặt hợp lệ trên bàn cờ 8x8
+                for (int r = 0; r <= BOARD_SIZE - rows; r++)
+                {
+                    for (int c = 0; c <= BOARD_SIZE - cols; c++)
+                    {
+                        if (Board.CanPlaceShape(shape, r, c))
+                        {
+                            int moveScore = EvaluateMoveScore(currentGrid, shape, r, c, cellCount);
+                            if (moveScore > bestScore)
+                            {
+                                bestScore = moveScore;
+                                bestShape = shape;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Nếu tìm thấy khối tối ưu nhất
+            if (bestShape != null)
+            {
+                int color = rand.Next(1, 8);
+                return new BlockPiece(bestShape, color);
+            }
+
+            // Dự phòng bàn cờ cực kỳ chật hẹp: trả về khối đơn 1x1 cứu nguy
+            return new BlockPiece(new int[,] { { 1 } }, rand.Next(1, 8));
+        }
+
+        // Đánh giá điểm chiến lược của một nước đi giả lập
+        private int EvaluateMoveScore(int[,] currentGrid, int[,] shape, int startR, int startC, int cellCount)
+        {
+            int rows = shape.GetLength(0);
+            int cols = shape.GetLength(1);
+
+            // Tạo bản sao bàn cờ để đặt thử
+            int[,] temp = (int[,])currentGrid.Clone();
+            for (int r = 0; r < rows; r++)
+            {
+                for (int c = 0; c < cols; c++)
+                {
+                    if (shape[r, c] != 0)
+                    {
+                        temp[startR + r, startC + c] = 1;
+                    }
+                }
+            }
+
+            // 1. Đếm số dòng/cột sẽ bị nổ
+            int clearedLines = 0;
+            bool[] fullRows = new bool[BOARD_SIZE];
+            bool[] fullCols = new bool[BOARD_SIZE];
+
+            for (int r = 0; r < BOARD_SIZE; r++)
+            {
+                bool full = true;
+                for (int c = 0; c < BOARD_SIZE; c++)
+                {
+                    if (temp[r, c] == 0) { full = false; break; }
+                }
+                if (full) { fullRows[r] = true; clearedLines++; }
+            }
+
+            for (int c = 0; c < BOARD_SIZE; c++)
+            {
+                bool full = true;
+                for (int r = 0; r < BOARD_SIZE; r++)
+                {
+                    if (temp[r, c] == 0) { full = false; break; }
+                }
+                if (full) { fullCols[c] = true; clearedLines++; }
+            }
+
+            int score = 0;
+
+            if (clearedLines > 0)
+            {
+                // ƯU TIÊN SỐ 1 TUYỆT ĐỐI: Phá nổ dòng (càng nhiều dòng nổ điểm càng áp đảo)
+                score += 10000 * clearedLines;
+            }
+            else
+            {
+                // ƯU TIÊN SỐ 2: Lấp vào những hàng/cột sắp đầy (7/8 ô)
+                int nearFullCount = 0;
+                for (int r = 0; r < BOARD_SIZE; r++)
+                {
+                    int filled = 0;
+                    for (int c = 0; c < BOARD_SIZE; c++) if (temp[r, c] != 0) filled++;
+                    if (filled == BOARD_SIZE - 1) nearFullCount++;
+                }
+                for (int c = 0; c < BOARD_SIZE; c++)
+                {
+                    int filled = 0;
+                    for (int r = 0; r < BOARD_SIZE; r++) if (temp[r, c] != 0) filled++;
+                    if (filled == BOARD_SIZE - 1) nearFullCount++;
+                }
+                score += 250 * nearFullCount;
+
+                // ƯU TIÊN SỐ 3: Khối nhỏ gọn ít chiếm diện tích (1x1, 1x2, góc L nhỏ)
+                score += (10 - cellCount) * 20;
+            }
+
+            // Cộng thêm điểm cho số ô trống còn lại sau khi nổ để bàn cờ thông thoáng nhất
+            int emptyCells = 0;
+            for (int r = 0; r < BOARD_SIZE; r++)
+            {
+                for (int c = 0; c < BOARD_SIZE; c++)
+                {
+                    if (fullRows[r] || fullCols[c] || temp[r, c] == 0)
+                    {
+                        emptyCells++;
+                    }
+                }
+            }
+            score += emptyCells * 5;
+
+            return score;
         }
 
         // Xóa sạch toàn bộ Item về 0 (dùng khi Reset lịch sử chơi)

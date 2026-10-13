@@ -376,25 +376,25 @@ namespace BlockBlast
         }
 
         // 2. Nút "Bảng xếp hạng" trên Menu chính
-        private void btnMenuLeaderboard_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                var topScores = ScoreManager.LoadLeaderboardScores();
-                string leaderboardText = "--- BẢNG XẾP HẠNG TOP CAO THỦ ---\n\n";
-                int rank = 1;
-                foreach (var entry in topScores)
-                {
-                    leaderboardText += $"{rank}. {entry.PlayerName}: {entry.Score} điểm ({entry.Date:dd/MM/yyyy})\n";
-                    rank++;
-                    if (rank > 10) break;
-                }
-                if (topScores.Count == 0) leaderboardText += "Chưa có dữ liệu thành tích nào!";
+        //private void btnMenuLeaderboard_Click(object sender, EventArgs e)
+        //{
+        //    try
+        //    {
+        //        var topScores = ScoreManager.LoadLeaderboardScores();
+        //        string leaderboardText = "--- BẢNG XẾP HẠNG TOP CAO THỦ ---\n\n";
+        //        int rank = 1;
+        //        foreach (var entry in topScores)
+        //        {
+        //            leaderboardText += $"{rank}. {entry.PlayerName}: {entry.Score} điểm ({entry.Date:dd/MM/yyyy})\n";
+        //            rank++;
+        //            if (rank > 10) break;
+        //        }
+        //        if (topScores.Count == 0) leaderboardText += "Chưa có dữ liệu thành tích nào!";
 
-                MessageBox.Show(leaderboardText, "Bảng Xếp Hạng", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch { }
-        }
+        //        MessageBox.Show(leaderboardText, "Bảng Xếp Hạng", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        //    }
+        //    catch { }
+        //}
 
         // 3. Nút "Thông tin nhóm" trên Menu chính
         private void btnMenuAbout_Click(object sender, EventArgs e)
