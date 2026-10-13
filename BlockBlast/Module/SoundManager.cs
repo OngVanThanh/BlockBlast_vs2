@@ -16,6 +16,10 @@ namespace BlockBlast.Module
         private static byte[][] wavCombos;
         private static byte[] wavGameOver;
         private static byte[] wavSnap;
+        private static byte[] wavBombExplosion;
+        private static byte[] wavCrossLaser;
+        private static byte[] wavLightning;
+        private static byte[] wavGravity;
 
         static SoundManager()
         {
@@ -56,6 +60,49 @@ namespace BlockBlast.Module
                     double curFreq = 880 - (880 - 160) * (t / len);
                     return Math.Sin(2 * Math.PI * curFreq * t) * (1 - t / len);
                 }, 0.05f);
+
+                Random rng = new Random(42);
+
+                // 6. Bomb 3x3: Tiếng nổ "BÙÙÙM!" trầm rền (Sub-bass 150Hz -> 30Hz trộn nhiễu nổ, 380ms)
+                wavBombExplosion = GenerateWavBytes((t, len) =>
+                {
+                    double progress = t / len;
+                    double env = Math.Exp(-4.5 * progress);
+                    double bassFreq = 150 * Math.Exp(-3.5 * progress) + 28;
+                    double bass = Math.Sin(2 * Math.PI * bassFreq * t);
+                    double noise = (rng.NextDouble() * 2.0 - 1.0) * 0.65;
+                    return (bass * 0.75 + noise * 0.55) * env;
+                }, 0.38f);
+
+                // 7. Cross Laser: Tiếng tia năng lượng "CHÍU-ZZZZ!" (Quét tần số 1400Hz -> 180Hz + biến điệu, 280ms)
+                wavCrossLaser = GenerateWavBytes((t, len) =>
+                {
+                    double progress = t / len;
+                    double env = (1.0 - progress);
+                    double freq = 1400 - 1220 * Math.Pow(progress, 0.6);
+                    double mod = Math.Sin(2 * Math.PI * 55 * t) * 0.3 + 0.7;
+                    return Math.Sin(2 * Math.PI * freq * t) * mod * env;
+                }, 0.28f);
+
+                // 8. Color Lightning: Tiếng sét đánh "RẮC - ĐOÀNG!" (Xung điện cao tần + sấm rền 70Hz, 340ms)
+                wavLightning = GenerateWavBytes((t, len) =>
+                {
+                    double progress = t / len;
+                    double crackle = (rng.NextDouble() * 2.0 - 1.0) * Math.Exp(-3.0 * progress);
+                    double zap = Math.Sin(2 * Math.PI * (1800 - 1500 * progress) * t) * Math.Exp(-8.0 * progress);
+                    double thunder = Math.Sin(2 * Math.PI * 68 * t) * Math.Exp(-3.5 * progress);
+                    return (crackle * 0.55 + zap * 0.45 + thunder * 0.6) * (1.0 - progress * 0.5);
+                }, 0.34f);
+
+                // 9. Gravity Fall: Tiếng hút trọng lực & giáng sập đáy "VÙÙ - HUỴCH!" (280ms)
+                wavGravity = GenerateWavBytes((t, len) =>
+                {
+                    double progress = t / len;
+                    double sweepFreq = 480 - 410 * progress;
+                    double whoosh = Math.Sin(2 * Math.PI * sweepFreq * t) * (1.0 - progress * 0.4);
+                    double slam = progress > 0.65 ? Math.Sin(2 * Math.PI * 55 * t) * Math.Exp(-12 * (progress - 0.65)) * 1.4 : 0;
+                    return Math.Max(-1.0, Math.Min(1.0, whoosh * 0.6 + slam));
+                }, 0.28f);
             }
             catch { }
         }
@@ -63,6 +110,10 @@ namespace BlockBlast.Module
         public static void PlayPickup() => PlayBytes(wavPickup);
         public static void PlayDrop() => PlayBytes(wavDrop);
         public static void PlaySnap() => PlayBytes(wavSnap);
+        public static void PlayBombExplosion() => PlayBytes(wavBombExplosion);
+        public static void PlayCrossLaser() => PlayBytes(wavCrossLaser);
+        public static void PlayLightningStrike() => PlayBytes(wavLightning);
+        public static void PlayGravitySlam() => PlayBytes(wavGravity);
 
         public static void PlayLineClear(int comboLevel)
         {

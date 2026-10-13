@@ -528,7 +528,7 @@ namespace BlockBlast
             }
         }
 
-        /// <summary>Chữ nổi (+100, COMBO x2!, MEGA BLAST!) có viền tối và gradient vàng ánh kim.</summary>
+        /// <summary>Chữ nổi tự động co giãn cỡ chữ và kẹp trong phạm vi bàn cờ để không bị cắt mất chữ.</summary>
         public static void RenderFloatingText(Graphics g, string text, PointF center, float alpha)
         {
             if (string.IsNullOrEmpty(text) || alpha <= 0f) return;
@@ -536,19 +536,53 @@ namespace BlockBlast
             int a = (int)(255 * Math.Min(1f, alpha));
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
+            RectangleF clip = g.VisibleClipBounds;
+            float maxAllowedWidth = Math.Max(180f, clip.Width - 24f);
+
             using (GraphicsPath path = new GraphicsPath())
             using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
             {
-                path.AddString(text, UiFontFamily, (int)FontStyle.Bold, 34f, center, sf);
-                RectangleF bounds = path.GetBounds();
+                // 1. Tự động giảm fontSize từ 30f xuống tối thiểu 13f nếu chuỗi quá dài so với chiều ngang bàn cờ
+                float fontSize = 30f;
+                RectangleF bounds = RectangleF.Empty;
+
+                while (fontSize >= 13f)
+                {
+                    path.Reset();
+                    path.AddString(text, UiFontFamily, (int)FontStyle.Bold, fontSize, center, sf);
+                    bounds = path.GetBounds();
+                    if (bounds.Width <= maxAllowedWidth || fontSize <= 13f)
+                        break;
+                    fontSize -= 2f;
+                }
+
                 if (bounds.Width < 1 || bounds.Height < 1) return;
 
-                using (Pen outline = new Pen(Color.FromArgb(a * 220 / 255, 12, 14, 24), 6f) { LineJoin = LineJoin.Round })
+                // 2. Kẹp (Clamp) vị trí sao cho khung chữ không bị tràn ra ngoài 4 cạnh của pnlBoard
+                float dx = 0f, dy = 0f;
+                if (bounds.Left < 12f) dx = 12f - bounds.Left;
+                else if (bounds.Right > clip.Width - 12f) dx = (clip.Width - 12f) - bounds.Right;
+
+                if (bounds.Top < 12f) dy = 12f - bounds.Top;
+                else if (bounds.Bottom > clip.Height - 12f) dy = (clip.Height - 12f) - bounds.Bottom;
+
+                if (Math.Abs(dx) > 0.5f || Math.Abs(dy) > 0.5f)
+                {
+                    using (Matrix m = new Matrix())
+                    {
+                        m.Translate(dx, dy);
+                        path.Transform(m);
+                        bounds = path.GetBounds();
+                    }
+                }
+
+                float outlineWidth = Math.Max(3.5f, fontSize / 5.5f);
+                using (Pen outline = new Pen(Color.FromArgb(a * 220 / 255, 12, 14, 24), outlineWidth) { LineJoin = LineJoin.Round })
                 {
                     g.DrawPath(outline, path);
                 }
                 using (LinearGradientBrush fill = new LinearGradientBrush(
-                           RectangleF.Inflate(bounds, 0, 1),
+                           RectangleF.Inflate(bounds, 0, 2),
                            Color.FromArgb(a, 255, 240, 150),
                            Color.FromArgb(a, 255, 160, 40),
                            LinearGradientMode.Vertical))
@@ -605,8 +639,8 @@ namespace BlockBlast
                 g.DrawString($"ĐIỂM: {score}", scoreFont, scoreBrush, new RectangleF(0, h * 0.30f, w, 40), sf);
             }
 
-            // 4. Kỷ lục "🎉 KỶ LỤC MỚI 🎉" hoặc "KỶ LỤC: 1050"
-            string recordText = isNewRecord ? $"🎉 KỶ LỤC MỚI: {score} 🎉" : $"KỶ LỤC: {highScore}";
+            // 4. Kỷ lục "KỶ LỤC MỚI!" hoặc "KỶ LỤC: 1050"
+            string recordText = isNewRecord ? $"KỶ LỤC MỚI: {score}!" : $"KỶ LỤC: {highScore}";
             Color recordColor = isNewRecord ? Color.FromArgb(255, 215, 0) : Color.FromArgb(160, 165, 181);
             using (Font recordFont = new Font("Segoe UI", 13.5f, FontStyle.Bold))
             using (Brush recordBrush = new SolidBrush(recordColor))

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace BlockBlast.Module
 {
@@ -10,6 +10,13 @@ namespace BlockBlast.Module
         public int[,] BoardLayout { get; set; }
         public int[,] DockPieceShape { get; set; }
         public int ColorIndex { get; set; }
+
+        // Tọa độ bắt buộc phải đặt khối (nếu = -1 là không khóa tọa độ cố định)
+        public int TargetRow { get; set; } = -1;
+        public int TargetCol { get; set; } = -1;
+
+        // Nếu màn này dạy dùng Item thì gán loại Item cần cấp cho người chơi thử
+        public ItemType? RequiredItem { get; set; } = null;
     }
 
     // Class quản lý tiến trình các màn chơi
@@ -48,7 +55,9 @@ namespace BlockBlast.Module
                 Instruction = "Kéo khối 2x2 thả vào TÂM chữ thập để nổ Combo!",
                 BoardLayout = board1,
                 DockPieceShape = new int[,] { { 1, 1 }, { 1, 1 } },
-                ColorIndex = 2
+                ColorIndex = 2,
+                TargetRow = 3,
+                TargetCol = 3
             });
 
             // ==========================================
@@ -66,7 +75,9 @@ namespace BlockBlast.Module
                 Instruction = "Đặt khối 1x4 vào khe hở để hoàn thành hàng ngang!",
                 BoardLayout = board2,
                 DockPieceShape = new int[,] { { 1, 1, 1, 1 } },
-                ColorIndex = 4
+                ColorIndex = 4,
+                TargetRow = 2,
+                TargetCol = 2
             });
 
             // ==========================================
@@ -91,7 +102,97 @@ namespace BlockBlast.Module
                 Instruction = "Thả khối 3x3 vào góc trống để nổ tung 3 hàng cùng lúc!",
                 BoardLayout = board3,
                 DockPieceShape = new int[,] { { 1, 1, 1 }, { 1, 1, 1 }, { 1, 1, 1 } },
-                ColorIndex = 1
+                ColorIndex = 1,
+                TargetRow = 1,
+                TargetCol = 1
+            });
+
+            // ==========================================
+            // MÀN 4: THỬ ITEM ĐỔI GẠCH (RerollDock)
+            // ==========================================
+            int[,] board4 = new int[8, 8];
+            for (int c = 0; c < 8; c++)
+            {
+                if (c != 3 && c != 4) board4[4, c] = 2; // Hàng 4 chừa trống 2 ô nhưng khay chưa có gạch
+            }
+            levels.Add(new TutorialStep
+            {
+                Title = "Màn 4/8: Item Đổi Gạch",
+                Instruction = "Khay đang trống! Hãy CLICK vào 'Đổi Gạch' ở cột phải để lấy gạch mới rồi đặt lên bàn cờ!",
+                BoardLayout = board4,
+                DockPieceShape = null, // Khay trống để người chơi bấm Đổi Gạch
+                ColorIndex = 2,
+                RequiredItem = ItemType.RerollDock
+            });
+
+            // ==========================================
+            // MÀN 5: THỬ ITEM BOM 3x3 (Kéo ná cao su)
+            // ==========================================
+            int[,] board5 = new int[8, 8];
+            for (int r = 2; r <= 4; r++)
+                for (int c = 2; c <= 4; c++)
+                    board5[r, c] = 1; // Cụm gạch 3x3 giữa bàn cờ
+
+            levels.Add(new TutorialStep
+            {
+                Title = "Màn 5/8: Bắn Bom 3x3",
+                Instruction = "Nhấn giữ 'Bom 3x3', KÉO CĂNG NÁ SANG PHẢI để đường đạn vàng trỏ vào cụm gạch rồi thả tay!",
+                BoardLayout = board5,
+                DockPieceShape = null,
+                RequiredItem = ItemType.Bomb3x3
+            });
+
+            // ==========================================
+            // MÀN 6: THỬ ITEM TIA CHỮ THẬP
+            // ==========================================
+            int[,] board6 = new int[8, 8];
+            for (int i = 1; i < 7; i++)
+            {
+                board6[3, i] = 4; // Hàng 3
+                board6[i, 3] = 4; // Cột 3
+            }
+            levels.Add(new TutorialStep
+            {
+                Title = "Màn 6/8: Bắn Tia Chữ Thập",
+                Instruction = "Kéo căng ná bắn 'Tia Chữ Thập' trúng tâm chữ thập trên bàn cờ để quét ngang & dọc!",
+                BoardLayout = board6,
+                DockPieceShape = null,
+                RequiredItem = ItemType.CrossClear
+            });
+
+            // ==========================================
+            // MÀN 7: THỬ ITEM SẤM SÉT
+            // ==========================================
+            int[,] board7 = new int[8, 8];
+            board7[2, 2] = 1; board7[2, 5] = 1;
+            board7[3, 3] = 1; board7[3, 4] = 1;
+            board7[4, 3] = 1; board7[4, 4] = 1;
+            board7[5, 2] = 1; board7[5, 5] = 1;
+
+            levels.Add(new TutorialStep
+            {
+                Title = "Màn 7/8: Bắn Sấm Sét",
+                Instruction = "Kéo ná ngắm bắn 'Sấm Sét' trúng đúng 1 viên gạch ĐỎ để tiêu diệt toàn bộ gạch cùng màu!",
+                BoardLayout = board7,
+                DockPieceShape = null,
+                RequiredItem = ItemType.ColorLightning
+            });
+
+            // ==========================================
+            // MÀN 8: THỬ ITEM TRỌNG LỰC
+            // ==========================================
+            int[,] board8 = new int[8, 8];
+            for (int c = 0; c < 8; c++)
+            {
+                board8[c % 4, c] = 3; // 8 viên gạch nằm lơ lửng ở 8 cột, khi rơi xuống đáy sẽ nổ 1 hàng ngang!
+            }
+            levels.Add(new TutorialStep
+            {
+                Title = "Màn 8/8: Bắn Trọng Lực",
+                Instruction = "Kéo ná bắn 'Trọng Lực' vào bàn cờ để dồn các viên gạch lơ lửng rơi xuống đáy và nổ dòng!",
+                BoardLayout = board8,
+                DockPieceShape = null,
+                RequiredItem = ItemType.GravityFall
             });
         }
 

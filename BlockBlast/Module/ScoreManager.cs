@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -46,6 +46,30 @@ namespace BlockBlast.Module
                     string path = Path.Combine(GetAppDataFolder(), "highscore.dat");
                     File.WriteAllText(path, score.ToString());
                 }
+            }
+            catch { }
+        }
+
+        public static void ResetAllHistory()
+        {
+            try
+            {
+                string highPath = Path.Combine(GetAppDataFolder(), "highscore.dat");
+                if (File.Exists(highPath)) File.Delete(highPath);
+
+                string lbPath = Path.Combine(GetAppDataFolder(), "leaderboard.dat");
+                if (File.Exists(lbPath)) File.Delete(lbPath);
+
+                string tutPath = Path.Combine(GetAppDataFolder(), "tutorial_done.txt");
+                if (File.Exists(tutPath)) File.Delete(tutPath);
+
+                if (File.Exists("tutorial_done.txt")) File.Delete("tutorial_done.txt");
+
+                string saveFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BlockBlast", "gamestate.dat");
+                if (File.Exists(saveFilePath)) File.Delete(saveFilePath);
+
+                string saveJsonPath = Path.Combine(GetAppDataFolder(), "gamestate.json");
+                if (File.Exists(saveJsonPath)) File.Delete(saveJsonPath);
             }
             catch { }
         }

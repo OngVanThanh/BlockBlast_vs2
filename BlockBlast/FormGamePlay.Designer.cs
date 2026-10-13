@@ -146,7 +146,7 @@ namespace BlockBlast
             this.btnPause.Name = "btnPause";
             this.btnPause.Size = new System.Drawing.Size(82, 39);
             this.btnPause.TabIndex = 4;
-            this.btnPause.Text = "⏸ PAUSE";
+            this.btnPause.Text = "PAUSE";
             this.btnPause.UseVisualStyleBackColor = false;
             this.btnPause.Click += new System.EventHandler(this.btnOpenMenu_Click);
             // 
@@ -244,7 +244,7 @@ namespace BlockBlast
             this.btnReplay.Name = "btnReplay";
             this.btnReplay.Size = new System.Drawing.Size(135, 41);
             this.btnReplay.TabIndex = 3;
-            this.btnReplay.Text = "▶ CHƠI LẠI";
+            this.btnReplay.Text = "CHƠI LẠI";
             this.btnReplay.UseVisualStyleBackColor = false;
             // 
             // lblBestRecord
@@ -358,7 +358,7 @@ namespace BlockBlast
             this.btnBackToMenu.Name = "btnBackToMenu";
             this.btnBackToMenu.Size = new System.Drawing.Size(224, 37);
             this.btnBackToMenu.TabIndex = 6;
-            this.btnBackToMenu.Text = "🏠 VỀ MENU CHÍNH";
+            this.btnBackToMenu.Text = "VỀ MENU CHÍNH";
             this.btnBackToMenu.UseVisualStyleBackColor = false;
             // 
             // btnRestart
@@ -375,7 +375,7 @@ namespace BlockBlast
             this.btnRestart.Name = "btnRestart";
             this.btnRestart.Size = new System.Drawing.Size(225, 37);
             this.btnRestart.TabIndex = 3;
-            this.btnRestart.Text = "🔄 CHƠI LẠI TỪ ĐẦU";
+            this.btnRestart.Text = "CHƠI LẠI TỪ ĐẦU";
             this.btnRestart.UseVisualStyleBackColor = false;
             // 
             // btnExit
@@ -392,7 +392,7 @@ namespace BlockBlast
             this.btnExit.Name = "btnExit";
             this.btnExit.Size = new System.Drawing.Size(225, 37);
             this.btnExit.TabIndex = 5;
-            this.btnExit.Text = "🚪 THOÁT GAME";
+            this.btnExit.Text = "THOÁT GAME";
             this.btnExit.UseVisualStyleBackColor = false;
             // 
             // btnSound
@@ -409,7 +409,7 @@ namespace BlockBlast
             this.btnSound.Name = "btnSound";
             this.btnSound.Size = new System.Drawing.Size(225, 37);
             this.btnSound.TabIndex = 1;
-            this.btnSound.Text = "🔊 ÂM THANH: BẬT";
+            this.btnSound.Text = "ÂM THANH: BẬT";
             this.btnSound.UseVisualStyleBackColor = false;
             // 
             // btnResume
@@ -426,7 +426,7 @@ namespace BlockBlast
             this.btnResume.Name = "btnResume";
             this.btnResume.Size = new System.Drawing.Size(225, 37);
             this.btnResume.TabIndex = 2;
-            this.btnResume.Text = "▶ TIẾP TỤC";
+            this.btnResume.Text = "TIẾP TỤC";
             this.btnResume.UseVisualStyleBackColor = false;
             // 
             // pnlMainMenu
@@ -457,7 +457,7 @@ namespace BlockBlast
             this.btnNewGameMenu.Name = "btnNewGameMenu";
             this.btnNewGameMenu.Size = new System.Drawing.Size(225, 41);
             this.btnNewGameMenu.TabIndex = 8;
-            this.btnNewGameMenu.Text = "▶ TRÒ CHƠI MỚI";
+            this.btnNewGameMenu.Text = "TRÒ CHƠI MỚI";
             this.btnNewGameMenu.UseVisualStyleBackColor = false;
             // 
             // btnMenuAbout
@@ -474,7 +474,7 @@ namespace BlockBlast
             this.btnMenuAbout.Name = "btnMenuAbout";
             this.btnMenuAbout.Size = new System.Drawing.Size(225, 37);
             this.btnMenuAbout.TabIndex = 6;
-            this.btnMenuAbout.Text = "ℹ️ THÔNG TIN GAME";
+            this.btnMenuAbout.Text = "THÔNG TIN GAME";
             this.btnMenuAbout.UseVisualStyleBackColor = false;
             // 
             // btnMenuExit
@@ -491,7 +491,7 @@ namespace BlockBlast
             this.btnMenuExit.Name = "btnMenuExit";
             this.btnMenuExit.Size = new System.Drawing.Size(225, 37);
             this.btnMenuExit.TabIndex = 5;
-            this.btnMenuExit.Text = "🚪 THOÁT GAME";
+            this.btnMenuExit.Text = "THOÁT GAME";
             this.btnMenuExit.UseVisualStyleBackColor = false;
             // 
             // btnMenuPlay
@@ -508,7 +508,7 @@ namespace BlockBlast
             this.btnMenuPlay.Name = "btnMenuPlay";
             this.btnMenuPlay.Size = new System.Drawing.Size(225, 37);
             this.btnMenuPlay.TabIndex = 2;
-            this.btnMenuPlay.Text = "▶ TIẾP TỤC";
+            this.btnMenuPlay.Text = "TIẾP TỤC";
             this.btnMenuPlay.UseVisualStyleBackColor = false;
             // 
             // pnlMenuIteam

@@ -57,53 +57,55 @@ namespace BlockBlast
             return new BlockPiece(shape, colorIndex);
         }
 
+        // Danh sách chỉ số (Index) trong BlockPiece.AllShapes chia chuẩn theo 3 mức độ khó:
+        // - Nhóm 1 (Dễ - 1 đến 3 ô): 1x1, 1x2, 2x1, 1x3, 3x1, góc L nhỏ 2x2
+        private static readonly int[] EasyShapeIndices = { 0, 1, 2, 3, 4, 11, 12, 13, 14 };
+        // - Nhóm 2 (Vừa - 4 ô): 1x4, 4x1, vuông 2x2, chữ T, chữ Z/S
+        private static readonly int[] MediumShapeIndices = { 5, 6, 9, 19, 20, 21, 22, 23, 24, 25, 26 };
+        // - Nhóm 3 (Khó/Hiểm - 5 đến 9 ô): 1x5, 5x1, vuông đại 3x3, chữ L đại 3x3
+        private static readonly int[] HardShapeIndices = { 7, 8, 10, 15, 16, 17, 18 };
+
         private int GetWeightedShapeIndex(int score)
         {
             double roll = rand.NextDouble();
 
-            if (score < 1000)
+            if (score < 500)
             {
-                return GetRandomShapeFromCategory(1);
+                // Dưới 500đ: 60% Dễ - 30% Vừa - 10% Khó
+                if (roll < 0.60) return GetRandomShapeFromCategory(1);
+                if (roll < 0.90) return GetRandomShapeFromCategory(2);
+                return GetRandomShapeFromCategory(3);
             }
-            else if (score >= 1000 && score < 2000)
+            else if (score < 1500)
             {
-                return roll < 0.8 ? GetRandomShapeFromCategory(1) : GetRandomShapeFromCategory(2);
+                // 500 - 1500đ: 35% Dễ - 45% Vừa - 20% Khó
+                if (roll < 0.35) return GetRandomShapeFromCategory(1);
+                if (roll < 0.80) return GetRandomShapeFromCategory(2);
+                return GetRandomShapeFromCategory(3);
             }
-            else if (score >= 2000 && score < 3000)
+            else if (score < 3000)
             {
-                if (roll < 0.6) return GetRandomShapeFromCategory(1);
-                else if (roll < 0.8) return GetRandomShapeFromCategory(2);
-                else return GetRandomShapeFromCategory(3);
+                // 1500 - 3000đ: 15% Dễ - 45% Vừa - 40% Khó
+                if (roll < 0.15) return GetRandomShapeFromCategory(1);
+                if (roll < 0.60) return GetRandomShapeFromCategory(2);
+                return GetRandomShapeFromCategory(3);
             }
             else
             {
-                if (roll < 0.4) return GetRandomShapeFromCategory(1);
-                else if (roll < 0.7) return GetRandomShapeFromCategory(2);
-                else return GetRandomShapeFromCategory(3);
+                // Trên 3000đ: 5% Dễ - 35% Vừa - 60% Khó (Ép dùng Item hoặc thua nếu xếp bừa)
+                if (roll < 0.05) return GetRandomShapeFromCategory(1);
+                if (roll < 0.40) return GetRandomShapeFromCategory(2);
+                return GetRandomShapeFromCategory(3);
             }
         }
 
         private int GetRandomShapeFromCategory(int category)
         {
-            int totalShapes = BlockPiece.AllShapes.Count;
-
-            if (category == 1) // Khối đẹp: 1x1, thanh thẳng, vuông (Index 0 -> 10)
-            {
-                return rand.Next(0, Math.Min(11, totalShapes));
-            }
-            else if (category == 2) // Khối chữ L, chữ T (Index 11 -> 22)
-            {
-                int minIdx = Math.Min(11, totalShapes);
-                int maxIdx = Math.Min(23, totalShapes);
-                if (minIdx >= maxIdx) minIdx = 0;
-                return rand.Next(minIdx, maxIdx);
-            }
-            else // Khối chữ Z, chữ S và các khối còn lại (Index 23 -> hết)
-            {
-                int minIdx = Math.Min(23, totalShapes);
-                if (minIdx >= totalShapes) minIdx = 0;
-                return rand.Next(minIdx, totalShapes);
-            }
+            if (category == 1)
+                return EasyShapeIndices[rand.Next(EasyShapeIndices.Length)];
+            if (category == 2)
+                return MediumShapeIndices[rand.Next(MediumShapeIndices.Length)];
+            return HardShapeIndices[rand.Next(HardShapeIndices.Length)];
         }
 
         public bool CanPlacePiece(BlockPiece piece)
@@ -207,7 +209,11 @@ namespace BlockBlast
         public List<BlockPiece> GenerateValidPieceSet()
         {
             List<List<BlockPiece>> validCombinations = new List<List<BlockPiece>>();
-            int samplePoolSize = 60;
+
+            // Giảm dần số lần thử "cứu trợ" theo mức điểm; từ 3000đ trở lên tắt hẳn cứu trợ (samplePoolSize = 0)
+            int samplePoolSize = CurrentScore < 500 ? 30 :
+                                 CurrentScore < 1500 ? 10 :
+                                 CurrentScore < 3000 ? 4 : 0;
 
             int[][] possibleOrders = new int[][]
             {
@@ -221,34 +227,28 @@ namespace BlockBlast
 
             for (int i = 0; i < samplePoolSize; i++)
             {
-                List<BlockPiece> candidateSet = new List<BlockPiece>();
-                for (int j = 0; j < 3; j++)
+                List<BlockPiece> candidateSet = new List<BlockPiece>
                 {
-                    candidateSet.Add(CreateRandomPiece());
-                }
+                    CreateRandomPiece(),
+                    CreateRandomPiece(),
+                    CreateRandomPiece()
+                };
 
-                bool hasValidOrder = false;
                 foreach (var order in possibleOrders)
                 {
                     if (CanPlaceSequentialOrder(candidateSet, order))
                     {
-                        hasValidOrder = true;
+                        validCombinations.Add(candidateSet);
                         break;
                     }
-                }
-
-                if (hasValidOrder)
-                {
-                    validCombinations.Add(candidateSet);
                 }
             }
 
             if (validCombinations.Count > 0)
             {
-                int randomIndex = rand.Next(validCombinations.Count);
-                List<BlockPiece> selectedSet = validCombinations[randomIndex];
+                List<BlockPiece> selectedSet = validCombinations[rand.Next(validCombinations.Count)];
 
-                // Xáo trộn ngẫu nhiên vị trí (Shuffle) để che giấu thứ tự đặt của hệ thống
+                // Xáo trộn vị trí ngẫu nhiên trên Dock
                 for (int idx = selectedSet.Count - 1; idx > 0; idx--)
                 {
                     int k = rand.Next(idx + 1);
@@ -256,19 +256,17 @@ namespace BlockBlast
                     selectedSet[idx] = selectedSet[k];
                     selectedSet[k] = temp;
                 }
-
                 return selectedSet;
             }
 
-            // Fallback khi bàn cờ quá chật
-            List<BlockPiece> fallbackSet = new List<BlockPiece>
+            // BỎ fallback [1x1, 1x2, 2x1]: Khi bàn cờ quá chật hoặc điểm cao, sinh thẳng theo trọng số độ khó!
+            // Người chơi bắt buộc phải dùng các Item phá gạch đang có, nếu hết Item sẽ thua.
+            return new List<BlockPiece>
             {
-                new BlockPiece(new int[,] { { 1 } }, rand.Next(1, 8)),
-                new BlockPiece(new int[,] { { 1, 1 } }, rand.Next(1, 8)),
-                new BlockPiece(new int[,] { { 1 }, { 1 } }, rand.Next(1, 8))
+                CreateRandomPiece(),
+                CreateRandomPiece(),
+                CreateRandomPiece()
             };
-
-            return fallbackSet;
         }
 
         public void AddScore(int points)
@@ -306,6 +304,19 @@ namespace BlockBlast
             return Path.Combine(folder, "gamestate.json");
         }
 
+        // BỔ SUNG: Kiểm tra có ván chơi đang lưu hay không
+        public bool HasSavedGame => File.Exists(GetSaveGameFilePath());
+
+        // BỔ SUNG: Xóa file lưu khi Game Over hoặc Chơi Lại mới
+        public void DeleteSavedGame()
+        {
+            try
+            {
+                string path = GetSaveGameFilePath();
+                if (File.Exists(path)) File.Delete(path);
+            }
+            catch { }
+        }
         public void SaveGameState(Panel pnl1, Panel pnl2, Panel pnl3)
         {
             try
@@ -409,12 +420,11 @@ namespace BlockBlast
                     else
                     {
                         panels[i].Tag = null;
-                        panels[i].Visible = false;
+                        panels[i].Visible = true;
                     }
                     panels[i].Invalidate();
                 }
 
-                File.Delete(path);
                 return true;
             }
             catch
@@ -525,9 +535,94 @@ namespace BlockBlast
                 }
 
                 model.DockPieces = new List<DockPieceModel>();
-                for (int i = 0; i < 3; i++)
+                int dockKey = json.IndexOf("DockPieces");
+                if (dockKey != -1)
                 {
-                    model.DockPieces.Add(new DockPieceModel { IsVisible = false, ColorIndex = 1, ShapeMatrix = new int[1][] { new int[] { 1 } } });
+                    int startBracket = json.IndexOf('[', dockKey);
+                    int endBracket = FindMatchingCloseBracket(json, startBracket);
+                    if (startBracket != -1 && endBracket != -1)
+                    {
+                        string dockContent = json.Substring(startBracket + 1, endBracket - startBracket - 1);
+                        int searchIdx = 0;
+                        while (searchIdx < dockContent.Length)
+                        {
+                            int objStart = dockContent.IndexOf('{', searchIdx);
+                            if (objStart == -1) break;
+                            int objEnd = dockContent.IndexOf('}', objStart);
+                            if (objEnd == -1) break;
+
+                            string objStr = dockContent.Substring(objStart + 1, objEnd - objStart - 1);
+                            var dockItem = new DockPieceModel();
+
+                            // 1. Đọc trạng thái IsVisible
+                            int visIdx = objStr.IndexOf("IsVisible");
+                            if (visIdx != -1)
+                            {
+                                int colon = objStr.IndexOf(':', visIdx);
+                                int comma = objStr.IndexOfAny(new char[] { ',', '\r', '\n' }, colon);
+                                string val = (comma != -1 ? objStr.Substring(colon + 1, comma - colon - 1) : objStr.Substring(colon + 1)).Trim();
+                                dockItem.IsVisible = val.ToLower().Contains("true");
+                            }
+
+                            // 2. Đọc mã màu ColorIndex
+                            int colIdx = objStr.IndexOf("ColorIndex");
+                            if (colIdx != -1)
+                            {
+                                int colon = objStr.IndexOf(':', colIdx);
+                                int comma = objStr.IndexOfAny(new char[] { ',', '\r', '\n' }, colon);
+                                string val = (comma != -1 ? objStr.Substring(colon + 1, comma - colon - 1) : objStr.Substring(colon + 1)).Trim();
+                                int cVal = 0;
+                                int.TryParse(val, out cVal);
+                                dockItem.ColorIndex = cVal;
+                            }
+
+                            // 3. Đọc ma trận hình dáng ShapeMatrix
+                            int shapeIdx = objStr.IndexOf("ShapeMatrix");
+                            if (shapeIdx != -1)
+                            {
+                                int sOpen = objStr.IndexOf('[', shapeIdx);
+                                int sClose = FindMatchingCloseBracket(objStr, sOpen);
+                                if (sOpen != -1 && sClose != -1)
+                                {
+                                    string shapeContent = objStr.Substring(sOpen + 1, sClose - sOpen - 1).Trim();
+                                    List<int[]> rowsList = new List<int[]>();
+                                    int rIdx = 0;
+                                    while (rIdx < shapeContent.Length)
+                                    {
+                                        int rStart = shapeContent.IndexOf('[', rIdx);
+                                        if (rStart == -1) break;
+                                        int rEnd = shapeContent.IndexOf(']', rStart);
+                                        if (rEnd == -1) break;
+
+                                        string rowVals = shapeContent.Substring(rStart + 1, rEnd - rStart - 1).Trim();
+                                        if (!string.IsNullOrEmpty(rowVals))
+                                        {
+                                            string[] nums = rowVals.Split(',');
+                                            int[] rowArr = new int[nums.Length];
+                                            for (int n = 0; n < nums.Length; n++)
+                                            {
+                                                int nVal = 0;
+                                                int.TryParse(nums[n].Trim(), out nVal);
+                                                rowArr[n] = nVal;
+                                            }
+                                            rowsList.Add(rowArr);
+                                        }
+                                        rIdx = rEnd + 1;
+                                    }
+                                    dockItem.ShapeMatrix = rowsList.ToArray();
+                                }
+                            }
+
+                            model.DockPieces.Add(dockItem);
+                            searchIdx = objEnd + 1;
+                        }
+                    }
+                }
+
+                // Dự phòng nếu danh sách thiếu ô
+                while (model.DockPieces.Count < 3)
+                {
+                    model.DockPieces.Add(new DockPieceModel { IsVisible = false, ColorIndex = 0, ShapeMatrix = new int[0][] });
                 }
 
                 return model;
@@ -556,34 +651,111 @@ namespace BlockBlast
         //  4. HỆ THỐNG QUẢN LÝ ITEM & FILE items.json
         // ================================================================
 
+        // Đếm số lần rung chấn bàn cờ từ các Combo lớn (Chữ thập, 3 dòng, 4 dòng) để thưởng Trọng Lực
+        public int BoardShakeCounter { get; set; } = 0;
+
         // Khởi tạo sẵn 5 món đồ trong kho với số lượng ban đầu là 0
         private void InitItems()
         {
             ItemsInventory = new Dictionary<ItemType, Item>
-    {
-        { ItemType.RerollDock, new Item(ItemType.RerollDock, "Đổi Gạch", "Bấm để đổi 3 khối gạch mới", Color.FromArgb(52, 152, 219)) },
-        { ItemType.Bomb3x3, new Item(ItemType.Bomb3x3, "Bom 3x3", "Kéo đà ném nổ vùng 3x3", Color.FromArgb(231, 76, 60)) },
-        { ItemType.CrossClear, new Item(ItemType.CrossClear, "Tia Chữ Thập", "Kéo đà nổ hàng và cột", Color.FromArgb(241, 196, 15)) },
-        { ItemType.ColorLightning, new Item(ItemType.ColorLightning, "Sấm Sét", "Ngắm vào 1 ô để quét sạch các ô cùng màu", Color.FromArgb(155, 89, 182)) },
-        { ItemType.GravityFall, new Item(ItemType.GravityFall, "Trọng Lực", "Kéo đà dồn các khối rơi xuống đáy", Color.FromArgb(46, 204, 113)) }
-    };
+            {
+                { ItemType.RerollDock, new Item(ItemType.RerollDock, "Đổi Gạch", "Thêm 1 gạch mới vào khay trống", Color.FromArgb(52, 152, 219)) },
+                { ItemType.Bomb3x3, new Item(ItemType.Bomb3x3, "Bom 3x3", "Kéo đà ném nổ vùng 3x3", Color.FromArgb(231, 76, 60)) },
+                { ItemType.CrossClear, new Item(ItemType.CrossClear, "Tia Chữ Thập", "Kéo đà nổ hàng và cột", Color.FromArgb(241, 196, 15)) },
+                { ItemType.ColorLightning, new Item(ItemType.ColorLightning, "Sấm Sét", "Ngắm vào 1 ô để quét sạch các ô cùng màu", Color.FromArgb(155, 89, 182)) },
+                { ItemType.GravityFall, new Item(ItemType.GravityFall, "Trọng Lực", "Kéo đà dồn các khối rơi xuống đáy", Color.FromArgb(46, 204, 113)) }
+            };
         }
 
-        // Thưởng Item khi người chơi ăn Combo n (n = số hàng + cột nổ)
-        public Item AwardComboItem(int linesCleared)
+        // Thưởng Item theo quy tắc mới:
+        // - 2 dòng song song: Đổi Gạch (không rung bàn cờ)
+        // - 2 dòng chữ thập (1 ngang + 1 dọc): Tia Chữ Thập (+1 Rung Chấn)
+        // - 3 dòng: Bom 3x3 (+1 Rung Chấn)
+        // - 4 dòng: Sấm Sét (+1 Rung Chấn)
+        // - Đủ 3 lần Rung Chấn: Thưởng thêm Trọng Lực
+        public Item AwardComboItem(int rowsCleared, int colsCleared, out bool triggeredShake, out bool awardedGravity)
         {
-            if (linesCleared >= 2)
+            triggeredShake = false;
+            awardedGravity = false;
+
+            int totalCleared = rowsCleared + colsCleared;
+            if (totalCleared < 2) return null;
+
+            bool isCross = (rowsCleared >= 1 && colsCleared >= 1);
+            ItemType rewardType;
+
+            if (totalCleared == 2)
             {
-                // Nếu n > 6 thì lấy mốc 6 (Trọng lực)
-                ItemType type = (ItemType)Math.Min(linesCleared, 6);
-                if (ItemsInventory.ContainsKey(type))
+                if (isCross)
                 {
-                    ItemsInventory[type].Add(1);
-                    SaveItemsJson(); // Tự động lưu lại ngay
-                    return ItemsInventory[type];
+                    // Nổ 2 hàng chữ thập (1 hàng + 1 cột) -> Tia Chữ Thập + tính Rung Chấn
+                    rewardType = ItemType.CrossClear;
+                    triggeredShake = true;
+                }
+                else
+                {
+                    // Nổ 2 hàng đôi song song -> Đổi Gạch (không tính Rung Chấn vì dễ)
+                    rewardType = ItemType.RerollDock;
+                    triggeredShake = false;
                 }
             }
-            return null;
+            else if (totalCleared == 3)
+            {
+                // Nổ 3 dòng -> Bom 3x3 + tính Rung Chấn
+                rewardType = ItemType.Bomb3x3;
+                triggeredShake = true;
+            }
+            else
+            {
+                // Nổ 4 dòng trở lên -> Sấm Sét + tính Rung Chấn
+                rewardType = ItemType.ColorLightning;
+                triggeredShake = true;
+            }
+
+            Item rewarded = null;
+            if (ItemsInventory.ContainsKey(rewardType))
+            {
+                ItemsInventory[rewardType].Add(1);
+                rewarded = ItemsInventory[rewardType];
+            }
+
+            // Tích lũy Rung Chấn từ Combo Chữ Thập / 3 dòng / 4 dòng
+            if (triggeredShake)
+            {
+                BoardShakeCounter++;
+                if (BoardShakeCounter >= 3)
+                {
+                    BoardShakeCounter = 0;
+                    if (ItemsInventory.ContainsKey(ItemType.GravityFall))
+                    {
+                        ItemsInventory[ItemType.GravityFall].Add(1);
+                        awardedGravity = true;
+                    }
+                }
+            }
+
+            SaveItemsJson();
+            return rewarded;
+        }
+
+        // Sinh 1 viên gạch mới ưu tiên đặt vừa bàn cờ cho Item Đổi Gạch (lấp vào 1 khay trống)
+        public BlockPiece CreatePieceForEmptySlot()
+        {
+            return CreateRandomPiece();
+        }
+
+        // Xóa sạch toàn bộ Item về 0 (dùng khi Reset lịch sử chơi)
+        public void ResetAllItems()
+        {
+            BoardShakeCounter = 0;
+            if (ItemsInventory != null)
+            {
+                foreach (var item in ItemsInventory.Values)
+                {
+                    item.Count = 0;
+                }
+            }
+            SaveItemsJson();
         }
 
         // Tạo khối nhỏ may mắn (1 đến 4 ô) cho Item 1 (Copy / Lucky Piece)
@@ -614,12 +786,25 @@ namespace BlockBlast
             return ItemsInventory.Values.Sum(i => i.Count);
         }
 
-        // Điều kiện GameOver mới: Bàn cờ hết nước đi VÀ kho đồ hết sạch Item
+        // Điều kiện GameOver
         public bool CheckGameOverWithItems(List<BlockPiece> remainingPieces)
         {
             bool noMovesOnBoard = CheckGameOver(remainingPieces);
-            // Chỉ thua khi không còn nước đi VÀ tổng số Item == 0
-            return noMovesOnBoard && (GetTotalItemCount() == 0);
+            if (!noMovesOnBoard) return false;
+
+            int usableItems = 0;
+            if (ItemsInventory != null)
+            {
+                foreach (var kvp in ItemsInventory)
+                {
+                    // Nếu cả 3 khay đều đang đầy gạch thì Item Đổi Gạch không thể dùng để cứu nguy được
+                    if (kvp.Key == ItemType.RerollDock && remainingPieces != null && remainingPieces.Count >= 3)
+                        continue;
+
+                    usableItems += kvp.Value.Count;
+                }
+            }
+            return usableItems == 0;
         }
 
         // Lưu kho đồ ra file items.json trong thư mục bin/Debug
