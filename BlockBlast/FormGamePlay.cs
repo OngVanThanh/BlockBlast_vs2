@@ -79,6 +79,7 @@ namespace BlockBlast
             if (pnlGameOver != null) pnlGameOver.Visible = false;
             if (pnlPause != null) pnlPause.Visible = false;
             if (pnlAbout != null) pnlAbout.Visible = false;
+            if (pnlMenuIteam != null) pnlMenuIteam.Visible = true;
 
             InitTutorialLabel();
             LayoutGameControls();
@@ -189,6 +190,7 @@ namespace BlockBlast
             if (pnlPause != null) pnlPause.Visible = false;
             if (pnlGameOver != null) pnlGameOver.Visible = false;
             if (pnlAbout != null) pnlAbout.Visible = false;
+            if (pnlMenuIteam != null) pnlMenuIteam.Visible = false;
 
             // Hiển thị Menu chính và căn giữa Form
             if (pnlMainMenu != null)
@@ -211,6 +213,7 @@ namespace BlockBlast
             if (pnlBoard != null) pnlBoard.Visible = true;
             if (pnlDock != null) pnlDock.Visible = true;
             if (pnlHeader != null) pnlHeader.Visible = true;
+            if (pnlMenuIteam != null) pnlMenuIteam.Visible = true;
 
             // Kiểm tra: Nếu game trước đó vẫn còn dang dở và chưa thua thì tiếp tục, ngược lại tạo mới
             if (isGameInProgress && !isGameOver)
@@ -1494,6 +1497,7 @@ namespace BlockBlast
             if (pnlBoard != null) pnlBoard.Visible = true;
             if (pnlDock != null) pnlDock.Visible = true;
             if (pnlHeader != null) pnlHeader.Visible = true;
+            if (pnlMenuIteam != null) pnlMenuIteam.Visible = true;
 
             btnRestart_Click(sender, e);
         }
