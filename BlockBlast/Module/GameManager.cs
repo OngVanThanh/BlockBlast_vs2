@@ -284,14 +284,39 @@ namespace BlockBlast
             CurrentScore = 0;
         }
 
-        public bool CheckGameOver(List<BlockPiece> remainingPieces)
+        public bool CheckGameOverWithItems(List<BlockPiece> remainingPieces)
         {
-            if (remainingPieces == null || remainingPieces.Count == 0) return false;
-            foreach (var piece in remainingPieces)
+            // Kiểm tra xem các khối gạch còn lại có đặt được lên bàn cờ hay không
+            if (remainingPieces != null && remainingPieces.Count > 0)
             {
-                if (CanPlacePiece(piece)) return false;
+                foreach (var piece in remainingPieces)
+                {
+                    // Nếu còn ít nhất một khối có thể đặt lên bàn cờ thì chưa Game Over
+                    if (CanPlacePiece(piece)) return false;
+                }
             }
-            return true;
+            else
+            {
+                // Nếu không có khối gạch nào trong danh sách thì không tính là thua
+                return false;
+            }
+
+            // Nếu không thể đặt bất kỳ khối nào lên bàn cờ, tiếp tục kiểm tra các vật phẩm (Items) có thể cứu nguy
+            int usableItems = 0;
+            if (ItemsInventory != null)
+            {
+                foreach (var kvp in ItemsInventory)
+                {
+                    // Nếu cả 3 khay đều đang đầy gạch thì Item Đổi Gạch không thể dùng để cứu nguy được
+                    if (kvp.Key == ItemType.RerollDock && remainingPieces.Count >= 3)
+                        continue;
+
+                    usableItems += kvp.Value.Count;
+                }
+            }
+
+            // Game Over thực sự khi không đặt được gạch VÀ cũng không còn vật phẩm nào khả dụng
+            return usableItems == 0;
         }
 
         // ================================================================
@@ -427,7 +452,7 @@ namespace BlockBlast
 
                 return true;
             }
-            catch
+                                                                                                                catch
             {
                 return false;
             }
@@ -920,26 +945,7 @@ namespace BlockBlast
             return ItemsInventory.Values.Sum(i => i.Count);
         }
 
-        // Điều kiện GameOver
-        public bool CheckGameOverWithItems(List<BlockPiece> remainingPieces)
-        {
-            bool noMovesOnBoard = CheckGameOver(remainingPieces);
-            if (!noMovesOnBoard) return false;
 
-            int usableItems = 0;
-            if (ItemsInventory != null)
-            {
-                foreach (var kvp in ItemsInventory)
-                {
-                    // Nếu cả 3 khay đều đang đầy gạch thì Item Đổi Gạch không thể dùng để cứu nguy được
-                    if (kvp.Key == ItemType.RerollDock && remainingPieces != null && remainingPieces.Count >= 3)
-                        continue;
-
-                    usableItems += kvp.Value.Count;
-                }
-            }
-            return usableItems == 0;
-        }
 
         // Lưu kho đồ ra file items.json trong thư mục bin/Debug
         public void SaveItemsJson()
