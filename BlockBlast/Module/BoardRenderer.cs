@@ -809,18 +809,23 @@ public static void ApplyModernTheme(Button[] buttons, Panel[] docks)
                 }
             }
 
-            // Huy hiệu Kỷ lục
-            Rectangle badgeRect = new Rectangle((w - 230) / 2, 75, 230, 34);
+            // Huy hiệu Kỷ lục (Mở rộng chiều rộng lên 340px để số điểm không bao giờ bị ngắt dòng hay che mất)
+            Rectangle badgeRect = new Rectangle((w - 340) / 2, 75, 340, 36);
             using (var badgePath = CreateRoundedPath(badgeRect, 16))
             using (SolidBrush badgeBg = new SolidBrush(Color.FromArgb(34, 40, 64)))
             using (Pen badgeBorder = new Pen(Color.FromArgb(120, 255, 204, 77), 1.5f))
             using (Font badgeFont = new Font("Segoe UI", 11F, FontStyle.Bold))
             using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(255, 215, 0)))
-            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            using (StringFormat sf = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center,
+                FormatFlags = StringFormatFlags.NoWrap
+            })
             {
                 g.FillPath(badgeBg, badgePath);
                 g.DrawPath(badgeBorder, badgePath);
-                g.DrawString($"★ KỶ LỤC CAO NHẤT: {highScore}", badgeFont, textBrush, badgeRect, sf);
+                g.DrawString($"★ KỶ LỤC CAO NHẤT: {highScore:N0} ★", badgeFont, textBrush, badgeRect, sf);
             }
         }
 

@@ -354,7 +354,8 @@ namespace BlockBlast
 
         private void PnlMainMenu_Paint(object sender, PaintEventArgs e)
         {
-            BoardRenderer.DrawMainMenuBackground(e.Graphics, pnlMainMenu.Width, pnlMainMenu.Height, gameManager.HighScore);
+            int high = Math.Max(gameManager.HighScore, ScoreManager.LoadSavedHighScore());
+            BoardRenderer.DrawMainMenuBackground(e.Graphics, pnlMainMenu.Width, pnlMainMenu.Height, high);
         }
 
         // 1. Nút "Tiếp tục" trên Menu chính
@@ -2493,12 +2494,14 @@ namespace BlockBlast
                 (this.ClientSize.Height - pnlLeaderboard.Height) / 2
             );
             RefreshLeaderboardData();
+            if (tabRecords != null) tabRecords.SelectedIndex = 0; // Luôn mở mặc định vào Tab 1 (Hồ sơ cá nhân & Kỷ lục đỉnh cao)
             BoardRenderer.ApplyRoundedRegion(pnlLeaderboard, 16);
             pnlLeaderboard.Visible = true;
             pnlLeaderboard.BringToFront();
             pnlLeaderboard.Invalidate();
         }
 
+        private TabControl tabRecords;
         private DataGridView dgvMatchHistory;
         private TableLayoutPanel pnlMedalsGrid;
         private Label lblStatBestScore;
@@ -2540,7 +2543,7 @@ namespace BlockBlast
             int tabAreaWidth = pnlLeaderboard.Width - 48;
             int tabItemWidth = (tabAreaWidth - 4) / 2;
 
-            TabControl tabRecords = new TabControl
+            tabRecords = new TabControl
             {
                 Location = new Point(24, 82),
                 Size = new Size(tabAreaWidth, pnlLeaderboard.Height - 146),
