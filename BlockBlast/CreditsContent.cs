@@ -16,7 +16,7 @@ namespace BlockBlast
         {
             new CreditMember("Văn Thanh", "51.01.104.092", "Logic game"),
             new CreditMember("Tuấn Hưng", "51.01.104.038", "Logic game"),
-            new CreditMember("Quang Hưng", "[Điền MSSV]", "Giao diện"),
+            new CreditMember("Quang Hưng", "51.01.104.037", "Giao diện"),
             new CreditMember("Tấn Phát", "51.01.104.069", "Giao diện")
         };
 

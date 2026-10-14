@@ -6,44 +6,72 @@ using System.Windows.Forms;
 namespace BlockBlast.Module
 {
     /// <summary>
-    /// Cửa sổ lớp phủ (per-pixel alpha layered window) dùng để vẽ khối gạch đang kéo
-    /// bám theo con trỏ chuột ở MỌI vị trí (trên bàn cờ, trên Dock, Header, ngoài bàn cờ...).
-    ///
-    /// Vẽ trong pnlBoard.Paint bị cắt (clip) trong phạm vi pnlBoard, nên khối gạch sẽ "biến mất"
-    /// khi chuột ra ngoài bàn cờ. Cửa sổ này nằm trên tất cả control, xuyên chuột (click-through)
-    /// và không bao giờ cướp focus / mouse capture của form chính.
+    /// Lớp phủ đồ họa siêu nhẹ kế thừa NativeWindow (Win32 thuần, KHÔNG phải Form).
+    /// Dùng để vẽ khối gạch và dây ná bắn bám theo chuột mượt mà không bị cắt viền.
+    /// Đảm bảo dự án chỉ có duy nhất 1 Form kế thừa System.Windows.Forms.Form.
     /// </summary>
-    internal sealed class DragGhostWindow : Form
+    internal sealed class DragGhostOverlay : NativeWindow, IDisposable
     {
+        private const int WS_POPUP = unchecked((int)0x80000000);
         private const int WS_EX_LAYERED = 0x00080000;
         private const int WS_EX_TRANSPARENT = 0x00000020;
         private const int WS_EX_TOOLWINDOW = 0x00000080;
         private const int WS_EX_NOACTIVATE = 0x08000000;
+
         private const int WM_NCHITTEST = 0x0084;
         private const int HTTRANSPARENT = -1;
+
         private const int ULW_ALPHA = 0x00000002;
         private const byte AC_SRC_OVER = 0x00;
         private const byte AC_SRC_ALPHA = 0x01;
+
         private const uint SWP_NOSIZE = 0x0001;
         private const uint SWP_NOZORDER = 0x0004;
         private const uint SWP_NOACTIVATE = 0x0010;
 
-        public DragGhostWindow()
+        private const int SW_HIDE = 0;
+        private const int SW_SHOWNOACTIVATE = 4;
+
+        private bool isDisposed = false;
+        public bool IsDisposed => isDisposed;
+        public bool Visible { get; private set; } = false;
+
+        public DragGhostOverlay(IWin32Window owner = null)
         {
-            FormBorderStyle = FormBorderStyle.None;
-            ShowInTaskbar = false;
-            StartPosition = FormStartPosition.Manual;
+            CreateParams cp = new CreateParams
+            {
+                Style = WS_POPUP,
+                ExStyle = WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+                Parent = owner != null ? owner.Handle : IntPtr.Zero
+            };
+            CreateHandle(cp);
         }
 
-        protected override bool ShowWithoutActivation => true;
-
-        protected override CreateParams CreateParams
+        public void Show()
         {
-            get
+            if (Handle != IntPtr.Zero && !isDisposed)
             {
-                CreateParams cp = base.CreateParams;
-                cp.ExStyle |= WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
-                return cp;
+                ShowWindow(Handle, SW_SHOWNOACTIVATE);
+                Visible = true;
+            }
+        }
+
+        public void Hide()
+        {
+            if (Handle != IntPtr.Zero && !isDisposed)
+            {
+                ShowWindow(Handle, SW_HIDE);
+                Visible = false;
+            }
+        }
+
+        public void Dispose()
+        {
+            if (!isDisposed)
+            {
+                isDisposed = true;
+                Visible = false;
+                DestroyHandle();
             }
         }
 
@@ -61,7 +89,7 @@ namespace BlockBlast.Module
         /// <summary>Cập nhật hình ảnh (bitmap ARGB) và vị trí màn hình của lớp phủ.</summary>
         public void SetBitmap(Bitmap bitmap, Point screenTopLeft)
         {
-            if (bitmap == null) return;
+            if (bitmap == null || Handle == IntPtr.Zero || isDisposed) return;
 
             IntPtr screenDc = GetDC(IntPtr.Zero);
             IntPtr memDc = CreateCompatibleDC(screenDc);
@@ -98,15 +126,15 @@ namespace BlockBlast.Module
             }
         }
 
-        /// <summary>Di chuyển lớp phủ (rẻ, không vẽ lại bitmap) - gọi mỗi lần MouseMove.</summary>
+        /// <summary>Di chuyển lớp phủ (không vẽ lại bitmap) - gọi mỗi lần MouseMove.</summary>
         public void MoveTo(Point screenTopLeft)
         {
-            if (!IsHandleCreated) return;
+            if (Handle == IntPtr.Zero || isDisposed) return;
             SetWindowPos(Handle, IntPtr.Zero, screenTopLeft.X, screenTopLeft.Y, 0, 0,
                          SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
         }
 
-        #region Win32
+        #region Win32 API
 
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT { public int x; public int y; }
@@ -129,6 +157,9 @@ namespace BlockBlast.Module
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetDC(IntPtr hWnd);

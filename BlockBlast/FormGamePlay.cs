@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -35,7 +36,7 @@ namespace BlockBlast
         private float floatingTextAlpha = 0f;
         private readonly Timer floatingTextTimer;
 
-        private DragGhostWindow dragGhost;
+        private DragGhostOverlay dragGhost;
         private Label lblTutorialGuide;
         private int sessionGameInitialHighScore = 0;
         private bool isGameOver = false;
@@ -81,36 +82,50 @@ namespace BlockBlast
 
         private Button btnResetHistoryMenu;
         private Button btnResetHistoryPause;
+        private Button btnMenuLeaderboard;
+        private Panel pnlLeaderboard;
+        private bool isDialogOpenedFromPause = false;
 
         private void fGamePlay_Load(object sender, EventArgs e)
         {
-            gameManager.HighScore = ScoreManager.LoadSavedHighScore();
-            sessionGameInitialHighScore = gameManager.HighScore;
+            try
+            {
+                gameManager.HighScore = ScoreManager.LoadSavedHighScore();
+                sessionGameInitialHighScore = gameManager.HighScore;
 
-            SoundManager.IsMuted = ScoreManager.LoadAudioSettings();
+                BoardRenderer.EnableDoubleBuffering(this);
+                SoundManager.IsMuted = ScoreManager.LoadAudioSettings();
 
-            if (btnReplay != null && btnReplay.Parent != pnlBoard) pnlBoard.Controls.Add(btnReplay);
-            if (btnReplay != null) btnReplay.Visible = false;
-            if (pnlGameOver != null) pnlGameOver.Visible = false;
-            if (pnlPause != null) pnlPause.Visible = false;
-            if (pnlAbout != null) pnlAbout.Visible = false;
-            if (pnlMenuIteam != null) pnlMenuIteam.Visible = true;
+                if (btnReplay != null && btnReplay.Parent != pnlBoard) pnlBoard.Controls.Add(btnReplay);
+                if (btnReplay != null) btnReplay.Visible = false;
+                if (pnlGameOver != null) pnlGameOver.Visible = false;
+                if (pnlPause != null) pnlPause.Visible = false;
+                if (pnlAbout != null) pnlAbout.Visible = false;
 
-            InitTutorialLabel();
-            InitResetHistoryButtons();
-            LayoutGameControls();
-  
-            this.Resize += (s, ev) => { if (this.WindowState != FormWindowState.Minimized) LayoutGameControls(); };
+                InitAboutDialog();
+                InitTutorialLabel();
+                InitResetHistoryButtons();
+                InitLeaderboardButtons(); 
+                InitLeaderboardDialog();
+                LayoutGameControls();
 
-            RegisterEventHandlers();
-            ApplyModernTheme();
-            UpdateScoreLabels();
-            InitItemUI();
-            LoadGameSessionOrTutorial();
-            isGameInProgress = true;
-            isGameOver = false;
-            // Hiển thị Menu chính ngay khi mở ứng dụng
-            ShowMainMenu();
+                this.Resize += (s, ev) => { if (this.WindowState != FormWindowState.Minimized) LayoutGameControls(); };
+
+                RegisterEventHandlers();
+                ApplyModernTheme();
+                UpdateScoreLabels();
+                InitItemUI();
+                LoadGameSessionOrTutorial();
+                isGameInProgress = false;
+                isGameOver = false;
+
+                // Hiển thị Menu chính ngay khi mở ứng dụng
+                ShowMainMenu();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Load Error]: {ex.Message}");
+            }
         }
 
         private void InitResetHistoryButtons()
@@ -204,43 +219,49 @@ namespace BlockBlast
 
         private void LoadGameSessionOrTutorial()
         {
-            // Kiểm tra xem có file save game cũ hay không, hoặc tutorial đã hoàn thành chưa
-            // Nếu bạn có lưu biến cờ tutorial hoàn thành (ví dụ: tutorialManager.IsTutorialCompleted), hãy dùng nó.
-            // Ở đây ta kết hợp kiểm tra HasSavedGame: nếu có game đang lưu dở thì ưu tiên load game cũ, ngược lại mới xét Tutorial nếu chưa chơi lần nào.
-
-            if (gameManager.HasSavedGame && gameManager.LoadGameState(pnlDockPiece1, pnlDockPiece2, pnlDockPiece3))
+            try
             {
+                // 1. Nếu có ván chơi dở dang từ trước -> Load lại bàn cờ và dock
+                if (gameManager.HasSavedGame && gameManager.LoadGameState(pnlDockPiece1, pnlDockPiece2, pnlDockPiece3))
+                {
+                    tutorialManager.IsTutorialActive = false;
+                    if (lblTutorialGuide != null) lblTutorialGuide.Visible = false;
+
+                    isGameInProgress = true;
+                    isGameOver = false;
+                    UpdateScoreLabels();
+                    pnlBoard.Invalidate();
+
+                    if (pnlDockPiece1.Tag == null && pnlDockPiece2.Tag == null && pnlDockPiece3.Tag == null)
+                    {
+                        GenerateNewPieces();
+                    }
+                    return;
+                }
+
+                // 2. Kích hoạt Tutorial nếu chưa từng hoàn thành và chưa có điểm
+                if (!tutorialManager.IsTutorialCompleted && gameManager.HighScore == 0)
+                {
+                    tutorialManager.ResetTutorial();
+                    LoadPuzzleLevel();
+                    return;
+                }
+
+                // 3. Đã học xong -> Vào ngay ván chơi thật
                 tutorialManager.IsTutorialActive = false;
                 if (lblTutorialGuide != null) lblTutorialGuide.Visible = false;
 
                 isGameInProgress = true;
                 isGameOver = false;
-                UpdateScoreLabels();
-                pnlBoard.Invalidate();
-
-                // NẾU CẢ 3 DOCK ĐỀU TRỐNG THÌ TỰ ĐỘNG SINH ĐỢT GẠCH MỚI
-                if (pnlDockPiece1.Tag == null && pnlDockPiece2.Tag == null && pnlDockPiece3.Tag == null)
-                {
-                    GenerateNewPieces();
-                }
-                return;
+                GenerateNewPieces();
             }
-
-            // Nếu không có save game cũ mà HighScore == 0 -> Mới chạy Tutorial lần đầu
-            if (gameManager.HighScore == 0)
+            catch (Exception ex)
             {
-                tutorialManager.ResetTutorial();
-                LoadPuzzleLevel();
-                return;
+                System.Diagnostics.Debug.WriteLine($"[LoadGameState Error]: {ex.Message}");
+                // Fallback an toàn: nếu file save lỗi thì khởi động bàn cờ mới tinh
+                gameManager.ResetGame();
+                GenerateNewPieces();
             }
-
-            // Trường hợp bình thường không có save nhưng đã có điểm cao -> Sinh gạch mới chơi bình thường
-            tutorialManager.IsTutorialActive = false;
-            if (lblTutorialGuide != null) lblTutorialGuide.Visible = false;
-
-            isGameInProgress = true;
-            isGameOver = false;
-            GenerateNewPieces();
         }
 
         // ================================================================
@@ -254,6 +275,16 @@ namespace BlockBlast
         private void ShowMainMenu()
         {
             CancelDrag();
+
+            // ẨN CÁC PANEL GAME ĐỂ KHÔNG BỊ VẼ NGẦM GÂY CHỚP MÀN HÌNH
+            if (pnlBoard != null) pnlBoard.Visible = false;
+            if (pnlDock != null) pnlDock.Visible = false;
+            if (pnlHeader != null) pnlHeader.Visible = false;
+            if (pnlMenuIteam != null) pnlMenuIteam.Visible = false;
+            if (lblTutorialGuide != null) lblTutorialGuide.Visible = false;
+            if (pnlPause != null) pnlPause.Visible = false;
+            if (pnlGameOver != null) pnlGameOver.Visible = false;
+            if (pnlAbout != null) pnlAbout.Visible = false;
 
             if (pnlMainMenu != null)
             {
@@ -269,7 +300,8 @@ namespace BlockBlast
                 // 2. Danh sách các nút theo thứ tự
                 List<Button> activeButtons = new List<Button>();
                 if (btnNewGameMenu != null) activeButtons.Add(btnNewGameMenu);
-                if (canContinue && btnMenuPlay != null) activeButtons.Add(btnMenuPlay); // Chỉ thêm khi được phép tiếp tục
+                if (canContinue && btnMenuPlay != null) activeButtons.Add(btnMenuPlay);
+                if (btnMenuLeaderboard != null) activeButtons.Add(btnMenuLeaderboard); // Nút Chiến Tích
                 if (btnMenuAbout != null) activeButtons.Add(btnMenuAbout);
                 if (btnResetHistoryMenu != null) activeButtons.Add(btnResetHistoryMenu);
                 if (btnMenuExit != null) activeButtons.Add(btnMenuExit);
@@ -322,59 +354,33 @@ namespace BlockBlast
 
         private void PnlMainMenu_Paint(object sender, PaintEventArgs e)
         {
-            Graphics g = e.Graphics;
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            int w = pnlMainMenu.Width;
-            int h = pnlMainMenu.Height;
-
-            // 1. Viền khung phát sáng
-            using (var path = BoardRenderer.CreateRoundedPath(new Rectangle(2, 2, w - 5, h - 5), 18))
-            using (Pen borderPen = new Pen(Color.FromArgb(110, 255, 159, 67), 2f))
-            {
-                g.DrawPath(borderPen, path);
-            }
-
-            // 2. Tiêu đề lớn "BLOCK BLAST" có bóng đổ 3D
-            using (Font titleFont = new Font("Segoe UI", 25F, FontStyle.Bold))
-            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center })
-            {
-                g.DrawString("BLOCK BLAST", titleFont, new SolidBrush(Color.FromArgb(160, 0, 0, 0)), new PointF(w / 2f + 2, 22), sf);
-                using (var brush = new System.Drawing.Drawing2D.LinearGradientBrush(
-                    new Rectangle(0, 18, w, 45),
-                    Color.FromArgb(255, 230, 100),
-                    Color.FromArgb(255, 120, 40),
-                    System.Drawing.Drawing2D.LinearGradientMode.Vertical))
-                {
-                    g.DrawString("BLOCK BLAST", titleFont, brush, new PointF(w / 2f, 20), sf);
-                }
-            }
-
-            // 3. Huy hiệu Kỷ lục (Dùng ngôi sao ★ thay vì 🏆 để không bị lỗi font ô vuông)
-            Rectangle badgeRect = new Rectangle((w - 230) / 2, 75, 230, 34);
-            using (var badgePath = BoardRenderer.CreateRoundedPath(badgeRect, 16))
-            using (SolidBrush badgeBg = new SolidBrush(Color.FromArgb(34, 40, 64)))
-            using (Pen badgeBorder = new Pen(Color.FromArgb(120, 255, 204, 77), 1.5f))
-            using (Font badgeFont = new Font("Segoe UI", 11F, FontStyle.Bold))
-            using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(255, 215, 0)))
-            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
-            {
-                g.FillPath(badgeBg, badgePath);
-                g.DrawPath(badgeBorder, badgePath);
-                g.DrawString($"★ KỶ LỤC CAO NHẤT: {gameManager.HighScore}", badgeFont, textBrush, badgeRect, sf);
-            }
+            BoardRenderer.DrawMainMenuBackground(e.Graphics, pnlMainMenu.Width, pnlMainMenu.Height, gameManager.HighScore);
         }
 
-        // 1. Nút "Bắt đầu chơi" trên Menu chính
+        // 1. Nút "Tiếp tục" trên Menu chính
         private void btnMenuPlay_Click(object sender, EventArgs e)
         {
-
-            // Ẩn menu đi để lộ ra bàn chơi và các block đã được load sẵn ngầm từ Form_Load
             if (pnlMainMenu != null) pnlMainMenu.Visible = false;
 
-            // Thiết lập trạng thái game
-            gameManager.IsPaused = false;
-            isGameInProgress = true;
-            isGameOver = false;
+            // BẬT LẠI ĐẦY ĐỦ CÁC PANEL GAME (Tránh lỗi màn hình đen)
+            if (pnlBoard != null) pnlBoard.Visible = true;
+            if (pnlDock != null) pnlDock.Visible = true;
+            if (pnlHeader != null) pnlHeader.Visible = true;
+            if (pnlMenuIteam != null) pnlMenuIteam.Visible = true;
+
+            // Nếu ván trước đang tạm dừng thì tiếp tục, ngược lại nạp ván từ file lưu
+            if (isGameInProgress && !isGameOver)
+            {
+                gameManager.IsPaused = false;
+                if (tutorialManager.IsTutorialActive && lblTutorialGuide != null) lblTutorialGuide.Visible = true;
+                pnlBoard.Invalidate();
+            }
+            else
+            {
+                LoadGameSessionOrTutorial();
+                isGameInProgress = true;
+                isGameOver = false;
+            }
 
             UpdateScoreLabels();
         }
@@ -400,14 +406,7 @@ namespace BlockBlast
         //    catch { }
         //}
 
-        // 3. Nút "Thông tin nhóm" trên Menu chính
-        private void btnMenuAbout_Click(object sender, EventArgs e)
-        {
-            using (FormCredits credits = new FormCredits())
-            {
-                credits.ShowDialog(this);
-            }
-        }
+
 
         // 4. Nút "Thoát" trên Menu chính
         private void btnMenuExit_Click(object sender, EventArgs e)
@@ -417,13 +416,44 @@ namespace BlockBlast
                 Application.Exit();
             }
         }
+        // 3. Nút "Thông tin nhóm" trên Menu chính
+        private void btnMenuAbout_Click(object sender, EventArgs e)
+        {
+            ShowAboutDialog();
+        }
+
+        // Hiển thị Popup Thông tin nhóm dạng hộp thoại nổi giữa màn hình Form
+        private void ShowAboutDialog()
+        {
+            if (pnlAbout == null) return;
+
+            // 1. Tạm ẩn Menu chính hoặc Menu Pause để không bị vẽ đè nút lên nhau
+            if (pnlMainMenu != null) pnlMainMenu.Visible = false;
+            if (pnlPause != null) pnlPause.Visible = false;
+
+            // 2. Định hình kích thước hộp thoại và căn ra CHÍNH GIỮA màn hình
+            pnlAbout.Parent = this;
+            int dialogW = Math.Min(680, Math.Max(500, this.ClientSize.Width - 40));
+            int dialogH = Math.Min(540, Math.Max(400, this.ClientSize.Height - 40));
+            pnlAbout.Size = new Size(dialogW, dialogH);
+            pnlAbout.Location = new Point(
+                (this.ClientSize.Width - pnlAbout.Width) / 2,
+                (this.ClientSize.Height - pnlAbout.Height) / 2
+            );
+
+            // 3. Cắt bo góc theo kích thước mới và hiển thị lên trên cùng
+            BoardRenderer.ApplyRoundedRegion(pnlAbout, 16);
+            pnlAbout.Visible = true;
+            pnlAbout.BringToFront();
+            pnlAbout.Invalidate();
+        }
 
         // 6. Nút đóng Panel About (`btnCloseAbout`)
         private void btnCloseAbout_Click(object sender, EventArgs e)
         {
             if (pnlAbout != null) pnlAbout.Visible = false;
 
-            // Nếu đang trong game thì quay lại menu tạm dừng (`pnlPause`), ngược lại về Menu chính
+            // Nếu đang trong game tạm dừng thì quay lại pnlPause, ngược lại về Menu chính
             if (isGameInProgress && !isGameOver && gameManager.IsPaused)
             {
                 if (pnlPause != null)
@@ -532,36 +562,7 @@ namespace BlockBlast
         }
         private void btnPause_Paint(object sender, PaintEventArgs e)
         {
-            Graphics g = e.Graphics;
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-
-            float cx = btnPause.Width / 2f;
-            float cy = btnPause.Height / 2f;
-
-            Color gearColor = Color.FromArgb(40, 48, 70); // Màu bánh răng sẫm hiện đại
-
-            using (SolidBrush brush = new SolidBrush(gearColor))
-            {
-                // 1. Vẽ 8 răng cưa (4 hình chữ nhật xoay góc 0, 45, 90, 135 độ)
-                for (int i = 0; i < 4; i++)
-                {
-                    float angle = i * 45f;
-                    var state = g.Save();
-                    g.TranslateTransform(cx, cy);
-                    g.RotateTransform(angle);
-                    g.FillRectangle(brush, -3.5f, -13f, 7f, 26f);
-                    g.Restore(state);
-                }
-
-                // 2. Vành tròn chính của bánh răng
-                g.FillEllipse(brush, cx - 10f, cy - 10f, 20f, 20f);
-
-                // 3. Lỗ rỗng ở giữa tâm bánh răng (lấy màu nền của nút)
-                using (SolidBrush holeBrush = new SolidBrush(btnPause.BackColor))
-                {
-                    g.FillEllipse(holeBrush, cx - 4f, cy - 4f, 8f, 8f);
-                }
-            }
+            BoardRenderer.DrawGearIcon(e.Graphics, btnPause.Width, btnPause.Height, btnPause.BackColor);
         }
         private void UpdateScoreLabels()
         {
@@ -690,54 +691,53 @@ namespace BlockBlast
         }
 
         private async void fGamePlay_MouseUp(object sender, MouseEventArgs e)
-        { 
-            if (draggingItem != null)
-            {
-                HandleItemDrop();
-                return;
-            }
-            if (draggingShape == null) return;
-            if (isGameOver || isProcessingMove || gameManager.IsPaused || e.Button != MouseButtons.Left)
-            {
-                CancelDrag();
-                return;
-            }
-           
-
-            int[,] shapeToPlace = draggingShape;
-            int colorToPlace = draggingColorIndex;
-            Panel currentDock = activeDockPanel;
-            int targetRow = hoverRow;
-            int targetCol = hoverCol;
-
-            EndDrag();
-
-            if (targetRow == -1 || targetCol == -1 || !gameManager.Board.CanPlaceShape(shapeToPlace, targetRow, targetCol))
-            {
-                if (currentDock != null) currentDock.Invalidate();
-                pnlBoard.Invalidate();
-                return;
-            }
-
-            // Nếu đang ở màn Tutorial có khóa vị trí đặt chuẩn (TargetRow, TargetCol)
-            if (tutorialManager.IsTutorialActive)
-            {
-                TutorialStep step = tutorialManager.GetCurrentLevel();
-                if (step != null && step.TargetRow != -1 && step.TargetCol != -1)
-                {
-                    if (targetRow != step.TargetRow || targetCol != step.TargetCol)
-                    {
-                        ShowFloatingText("X_X Hãy đặt đúng vào khe trống hướng dẫn! :\"\"\"", new PointF(pnlBoard.Width / 2f, pnlBoard.Height / 2f));
-                        if (currentDock != null) currentDock.Invalidate();
-                        pnlBoard.Invalidate();
-                        return;
-                    }
-                }
-            }
-
-            isProcessingMove = true;
+        {
             try
             {
+                if (draggingItem != null)
+                {
+                    HandleItemDrop();
+                    return;
+                }
+                if (draggingShape == null) return;
+                if (isGameOver || isProcessingMove || gameManager.IsPaused || e.Button != MouseButtons.Left)
+                {
+                    CancelDrag();
+                    return;
+                }
+
+                int[,] shapeToPlace = draggingShape;
+                int colorToPlace = draggingColorIndex;
+                Panel currentDock = activeDockPanel;
+                int targetRow = hoverRow;
+                int targetCol = hoverCol;
+
+                EndDrag();
+
+                if (targetRow == -1 || targetCol == -1 || !gameManager.Board.CanPlaceShape(shapeToPlace, targetRow, targetCol))
+                {
+                    if (currentDock != null) currentDock.Invalidate();
+                    pnlBoard.Invalidate();
+                    return;
+                }
+
+                // Khóa vị trí trong Pha 1 của Tutorial
+                if (tutorialManager.IsTutorialActive && tutorialManager.CurrentPhase == 1)
+                {
+                    TutorialStep step = tutorialManager.GetCurrentLevel();
+                    if (step != null && step.TargetRow != -1 && step.TargetCol != -1)
+                    {
+                        if (targetRow != step.TargetRow || targetCol != step.TargetCol)
+                        {
+                            ShowFloatingText("X_X Hãy đặt đúng vào khe trống hướng dẫn! :\"\"\"", new PointF(pnlBoard.Width / 2f, pnlBoard.Height / 2f));
+                            if (currentDock != null) currentDock.Invalidate();
+                            pnlBoard.Invalidate();
+                            return;
+                        }
+                    }
+                }
+
+                isProcessingMove = true;
                 gameManager.Board.PlaceShape(shapeToPlace, colorToPlace, targetRow, targetCol);
                 SoundManager.PlayDrop();
 
@@ -747,6 +747,11 @@ namespace BlockBlast
                 if (!await AnimateLineClearAsync()) return;
 
                 HandleGameProgressionAfterMove();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MouseUp Error]: {ex.Message}");
+                CancelDrag();
             }
             finally
             {
@@ -758,6 +763,44 @@ namespace BlockBlast
         {
             if (tutorialManager.IsTutorialActive)
             {
+                TutorialStep step = tutorialManager.GetCurrentLevel();
+
+                // Nếu vừa hoàn thành Pha 1 (Đặt gạch nổ combo)
+                if (step != null && tutorialManager.CurrentPhase == 1)
+                {
+                    // Cấp Item cho người chơi
+                    if (step.RewardedItem.HasValue)
+                    {
+                        gameManager.ItemsInventory[step.RewardedItem.Value].Count = 1;
+                        gameManager.SaveItemsJson();
+                        UpdateItemUI();
+                        SoundManager.PlayPickup();
+                        ShowFloatingText($"★ ĐÃ MỞ KHÓA: {gameManager.ItemsInventory[step.RewardedItem.Value].Name}!",
+                            new PointF(pnlBoard.Width / 2f, pnlBoard.Height / 2f));
+                    }
+
+                    // Nếu có bố cục mục tiêu thực hành Pha 2
+                    if (step.TargetBoardLayout != null)
+                    {
+                        tutorialManager.CurrentPhase = 2; // Chuyển sang Pha 2
+                        gameManager.Board.SetGrid(step.TargetBoardLayout);
+
+                        // Làm trống khay gạch để người chơi tập trung dùng Item
+                        pnlDockPiece1.Tag = null; pnlDockPiece1.Invalidate();
+                        pnlDockPiece2.Tag = null; pnlDockPiece2.Invalidate();
+                        pnlDockPiece3.Tag = null; pnlDockPiece3.Invalidate();
+
+                        if (lblTutorialGuide != null)
+                        {
+                            lblTutorialGuide.Text = $"{step.Title}: {step.PracticeInstruction}";
+                            lblTutorialGuide.Visible = true;
+                        }
+                        pnlBoard.Invalidate();
+                        return; // Chưa chuyển màn vội, chờ người chơi bắn Item!
+                    }
+                }
+
+                // Nếu hoàn thành Pha 2 hoặc màn không có Pha 2 -> Chuyển sang màn tiếp theo
                 if (tutorialManager.NextLevel())
                 {
                     LoadPuzzleLevel();
@@ -765,14 +808,15 @@ namespace BlockBlast
                 else
                 {
                     if (lblTutorialGuide != null) lblTutorialGuide.Visible = false;
-                    try { File.WriteAllText("tutorial_done.txt", "completed"); } catch { }
+                    tutorialManager.MarkTutorialCompleted();
 
                     tutorialManager.IsTutorialActive = false;
                     gameManager.ResetGame();
-                    gameManager.ResetAllItems(); // <-- Xóa sạch Item dùng thử trong Tutorial về 0
-                    UpdateItemUI();              // <-- Cập nhật lại giao diện cột Item
+                    gameManager.ResetAllItems();
+                    UpdateItemUI();
                     GenerateNewPieces();
                     pnlBoard.Invalidate();
+                    ShowFloatingText("★ XUẤT SẮC! BẠN ĐÃ TỐT NGHIỆP TUTORIAL!", new PointF(pnlBoard.Width / 2f, pnlBoard.Height / 2f));
                 }
             }
             else
@@ -806,7 +850,7 @@ namespace BlockBlast
 
         private void ShowDragGhost(int cellSize)
         {
-            if (dragGhost == null || dragGhost.IsDisposed) dragGhost = new DragGhostWindow { Owner = this };
+            if (dragGhost == null || dragGhost.IsDisposed) dragGhost = new DragGhostOverlay(this);
             using (Bitmap bmp = BoardRenderer.CreateFloatingPieceBitmap(draggingShape, draggingColorIndex, cellSize, GHOST_PADDING))
             {
                 Point boardPoint = pnlBoard.PointToClient(Cursor.Position);
@@ -920,119 +964,7 @@ namespace BlockBlast
             Item item = slot.Tag as Item;
             if (item == null) return;
 
-            Graphics g = e.Graphics;
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-
-            int w = slot.Width;
-            int h = slot.Height;
-            Rectangle rect = new Rectangle(1, 1, w - 3, h - 3);
-
-            bool hasItem = item.Count > 0;
-            bool isSelected = (draggingItem == item);
-
-            // 1. Vẽ Nền bo góc & Viền Neon
-            using (var path = BoardRenderer.CreateRoundedPath(rect, 10))
-            {
-                if (isSelected)
-                {
-                    using (SolidBrush bg = new SolidBrush(Color.FromArgb(50, 75, 125)))
-                        g.FillPath(bg, path);
-                    using (Pen border = new Pen(Color.FromArgb(255, 230, 100), 2f))
-                        g.DrawPath(border, path);
-                }
-                else if (hasItem)
-                {
-                    // Khi > 0: Nền sáng nổi bật + Viền Neon theo ThemeColor của item
-                    using (SolidBrush bg = new SolidBrush(Color.FromArgb(28, 34, 52)))
-                        g.FillPath(bg, path);
-                    using (Pen border = new Pen(Color.FromArgb(210, item.ThemeColor), 1.8f))
-                        g.DrawPath(border, path);
-                }
-                else
-                {
-                    // Khi == 0: Nền chìm tối + Viền xám mờ
-                    using (SolidBrush bg = new SolidBrush(Color.FromArgb(20, 23, 34)))
-                        g.FillPath(bg, path);
-                    using (Pen border = new Pen(Color.FromArgb(50, 55, 72), 1f))
-                        g.DrawPath(border, path);
-                }
-            }
-
-            // 2. Vẽ ICON VẬT PHẨM ở vị trí chính giữa ô
-            float iconCx = w / 2f;
-            float iconCy = h * 0.50f;
-            float iconRadius = Math.Min(w, h) * 0.19f; // Bán kính khoảng 11-13px
-
-            if (hasItem)
-            {
-                // Còn đồ: Vẽ icon sắc nét, rực rỡ màu sắc
-                DrawItemProjectileIcon(g, item.Type, iconCx, iconCy, iconRadius);
-            }
-            else
-            {
-                // Hết đồ: Vẽ icon mờ chìm (Silhouette)
-                DrawDimmedItemIcon(g, item.Type, iconCx, iconCy, iconRadius);
-            }
-        }
-
-        // Vẽ icon chìm mờ khi vật phẩm có số lượng = 0
-        private void DrawDimmedItemIcon(Graphics g, ItemType type, float cx, float cy, float radius)
-        {
-            using (SolidBrush dimBrush = new SolidBrush(Color.FromArgb(50, 56, 75)))
-            using (Pen dimPen = new Pen(Color.FromArgb(70, 78, 100), 1.2f))
-            {
-                if (type == ItemType.Bomb3x3)
-                {
-                    g.FillEllipse(dimBrush, cx - radius, cy - radius + 2, radius * 2, radius * 2);
-                    g.DrawEllipse(dimPen, cx - radius, cy - radius + 2, radius * 2, radius * 2);
-                }
-                else if (type == ItemType.CrossClear)
-                {
-                    float armLen = radius * 0.85f;
-                    float armThick = radius * 0.45f;
-                    g.FillRectangle(dimBrush, cx - armLen, cy - armThick / 2, armLen * 2, armThick);
-                    g.FillRectangle(dimBrush, cx - armThick / 2, cy - armLen, armThick, armLen * 2);
-                    g.DrawRectangle(dimPen, cx - armLen, cy - armThick / 2, armLen * 2, armThick);
-                    g.DrawRectangle(dimPen, cx - armThick / 2, cy - armLen, armThick, armLen * 2);
-                }
-                else if (type == ItemType.ColorLightning)
-                {
-                    PointF[] bolt = new PointF[]
-                    {
-                        new PointF(cx + 1, cy - radius),
-                        new PointF(cx - radius * 0.75f, cy + 1),
-                        new PointF(cx - 1, cy + 1),
-                        new PointF(cx - 3, cy + radius),
-                        new PointF(cx + radius * 0.75f, cy - 1),
-                        new PointF(cx + 1, cy - 1)
-                    };
-                    g.FillPolygon(dimBrush, bolt);
-                    g.DrawPolygon(dimPen, bolt);
-                }
-                else if (type == ItemType.GravityFall)
-                {
-                    PointF[] arrow1 = new PointF[]
-                    {
-                        new PointF(cx - radius * 0.7f, cy - radius * 0.4f),
-                        new PointF(cx + radius * 0.7f, cy - radius * 0.4f),
-                        new PointF(cx, cy + 2)
-                    };
-                    PointF[] arrow2 = new PointF[]
-                    {
-                        new PointF(cx - radius * 0.7f, cy + 1),
-                        new PointF(cx + radius * 0.7f, cy + 1),
-                        new PointF(cx, cy + radius * 0.9f)
-                    };
-                    g.FillPolygon(dimBrush, arrow1);
-                    g.FillPolygon(dimBrush, arrow2);
-                    g.DrawPolygon(dimPen, arrow1);
-                    g.DrawPolygon(dimPen, arrow2);
-                }
-                else
-                {
-                    g.DrawArc(dimPen, cx - radius * 0.7f, cy - radius * 0.7f, radius * 1.4f, radius * 1.4f, 40, 270);
-                }
-            }
+            BoardRenderer.DrawItemSlot(e.Graphics, slot.Width, slot.Height, item, draggingItem == item);
         }
 
         private void UpdateItemUI()
@@ -1087,6 +1019,12 @@ namespace BlockBlast
 
             int linesCleared = fullRows.Count + fullCols.Count;
             if (linesCleared == 0) return true;
+
+            // Ăn cùng lúc từ 4 hàng/cột trở lên -> Mở khóa Huân chương "Siêu Combo Tứ Hàng" (Chỉ tính khi chơi thật)
+            if (!tutorialManager.IsTutorialActive && linesCleared >= 4)
+            {
+                ScoreManager.UnlockMedal("COMBO_MEGA");
+            }
 
             int scoreGained = GameBoard.CalculateLineScore(linesCleared);
 
@@ -1214,12 +1152,8 @@ namespace BlockBlast
                 lblTutorialGuide.Visible = true;
             }
 
-            // Reset kho đồ về 0 và chỉ cấp đúng 1 món Item cần học ở màn hiện tại (nếu có)
+            // Reset kho đồ về 0 khi bắt đầu màn học (người chơi sẽ tự đặt gạch tạo nổ combo để mở khóa Item)
             gameManager.ResetAllItems();
-            if (level.RequiredItem.HasValue && gameManager.ItemsInventory.ContainsKey(level.RequiredItem.Value))
-            {
-                gameManager.ItemsInventory[level.RequiredItem.Value].Count = 1;
-            }
             UpdateItemUI();
 
             gameManager.Board.SetGrid(level.BoardLayout);
@@ -1280,8 +1214,12 @@ namespace BlockBlast
             if (current > gameManager.HighScore) gameManager.HighScore = current;
             ScoreManager.SaveHighScoreSilently(gameManager.HighScore);
 
-            // Lưu điểm số vào bảng xếp hạng Top 10
-            ScoreManager.SaveLeaderboardScore("Player", current);
+            // Chỉ ghi nhận điểm và huân chương mốc điểm khi chơi thật
+            if (!tutorialManager.IsTutorialActive && current > 0)
+            {
+                ScoreManager.CheckScoreMedals(current);
+                ScoreManager.SaveMatchHistory(current);
+            }
 
             try
             {
@@ -1324,11 +1262,19 @@ namespace BlockBlast
         private void btnResume_Click(object sender, EventArgs e)
         {
             gameManager.IsPaused = false;
-            if (pnlPause != null)
-            {
-                pnlPause.Visible = false;
-            }
+            if (pnlPause != null) pnlPause.Visible = false;
+            if (pnlMainMenu != null) pnlMainMenu.Visible = false;
+
+            // Bật lại đầy đủ các Panel game (chống đen màn hình)
+            if (pnlBoard != null) pnlBoard.Visible = true;
+            if (pnlDock != null) pnlDock.Visible = true;
+            if (pnlHeader != null) pnlHeader.Visible = true;
+            if (pnlMenuIteam != null) pnlMenuIteam.Visible = true;
+            if (tutorialManager.IsTutorialActive && lblTutorialGuide != null) lblTutorialGuide.Visible = true;
+
             pnlBoard.Invalidate();
+            UpdateScoreLabels();
+            UpdateItemUI();
         }
 
         // Nút "Chơi lại từ đầu" (Restart / Replay)
@@ -1388,16 +1334,23 @@ namespace BlockBlast
 
         private void fGamePlay_FormClosed(object sender, FormClosedEventArgs e)
         {
-            floatingTextTimer.Stop();
-            floatingTextTimer.Dispose();
-            slingshotTimer.Stop();
-            slingshotTimer.Dispose();
-            if (dragGhost != null && !dragGhost.IsDisposed) dragGhost.Dispose();
-
-            if (!isGameOver && isGameInProgress)
+            try
             {
-                gameManager.IsNewGame = false;
-                gameManager.SaveGameState(pnlDockPiece1, pnlDockPiece2, pnlDockPiece3, false);
+                floatingTextTimer.Stop();
+                floatingTextTimer.Dispose();
+                slingshotTimer.Stop();
+                slingshotTimer.Dispose();
+                if (dragGhost != null && !dragGhost.IsDisposed) dragGhost.Dispose();
+
+                if (!isGameOver && isGameInProgress)
+                {
+                    gameManager.IsNewGame = false;
+                    gameManager.SaveGameState(pnlDockPiece1, pnlDockPiece2, pnlDockPiece3, false);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[FormClosed Error]: {ex.Message}");
             }
         }
 
@@ -1431,15 +1384,21 @@ namespace BlockBlast
                 item.TryConsume();
                 gameManager.SaveItemsJson();
 
-                // Nếu đang ở Màn 4 Tutorial thì sinh đúng viên 1x2 để người chơi lấp khe trống hàng 4
+                // Nếu đang ở Tutorial thì sinh đúng viên 1x2 để người chơi lấp khe trống hàng 4
                 BlockPiece newPiece = tutorialManager.IsTutorialActive
-                    ? new BlockPiece(new int[,] { { 1, 1 } }, 2)
+                    ? new BlockPiece(new int[,] { { 1, 1 } }, 3)
                     : gameManager.CreatePieceForEmptySlot();
 
                 SetupDockPiece(emptyDock, newPiece);
 
                 SoundManager.PlayPickup();
                 ShowFloatingText("+1 GẠCH MỚI\nVÀO KHAY TRỐNG!", new PointF(pnlBoard.Width / 2f, pnlBoard.Height / 2f));
+
+                if (tutorialManager.IsTutorialActive && lblTutorialGuide != null)
+                {
+                    lblTutorialGuide.Text = "Màn 3/4: Tuyệt vời! Kéo viên gạch 1x2 vừa tạo vào khe trống để làm nổ hàng!";
+                }
+
                 UpdateItemUI();
                 pnlBoard.Invalidate();
                 if (!tutorialManager.IsTutorialActive) CheckGameOver();
@@ -1635,161 +1594,188 @@ namespace BlockBlast
             if (draggingItem == null || isProcessingMove || isSnapping) return;
             isProcessingMove = true;
 
-            Item item = draggingItem;
-            draggingItem = null;
-
-            int pullDx = slingPullPos.X - slingAnchor.X;
-            int pullDy = slingPullPos.Y - slingAnchor.Y;
-            double pullDist = Math.Sqrt(pullDx * pullDx + pullDy * pullDy);
-
-            // Kéo nhẹ quá (< 20px) thì coi như hủy bắn, không mất đồ
-            if (pullDist < 20)
+            try
             {
-                HideDragGhost();
-                isProcessingMove = false;
-                UpdateItemUI();
-                pnlBoard.Invalidate();
-                return;
-            }
+                Item item = draggingItem;
+                draggingItem = null;
 
-            // TÍNH TOÁN ĐIỂM RƠI VẬT LÝ (BẮN NGƯỢC CHIỀU KÉO)
-            const double POWER_MULTIPLIER = 4.2;
-            int landScreenX = (int)(slingAnchor.X - pullDx * POWER_MULTIPLIER);
-            int landScreenY = (int)(slingAnchor.Y - pullDy * POWER_MULTIPLIER);
-            Point targetScreen = new Point(landScreenX, landScreenY);
+                int pullDx = slingPullPos.X - slingAnchor.X;
+                int pullDy = slingPullPos.Y - slingAnchor.Y;
+                double pullDist = Math.Sqrt(pullDx * pullDx + pullDy * pullDy);
 
-            Point boardPos = pnlBoard.PointToClient(targetScreen);
-            bool isHitBoard = pnlBoard.ClientRectangle.Contains(boardPos);
-
-            // Tiêu hao item & lưu
-            item.TryConsume();
-            gameManager.SaveItemsJson();
-            UpdateItemUI();
-
-            // 1. HOẠT HỌA QUẢ BOM THỰC SỰ BAY QUA MÀN HÌNH THEO ĐƯỜNG CONG PARABOL
-            await FlyProjectileAsync(item, slingPullPos, targetScreen, arcHeight: 70);
-
-            int clearedCells = 0;
-            bool hitValidBoardCell = false;
-
-            // TRƯỜNG HỢP 1: BẮN TRÚNG BÀN CỜ
-            if (isHitBoard)
-            {
-                int cellSize = BoardRenderer.CalculateCellSize(pnlBoard.Size);
-                int targetCol = (boardPos.X - BoardRenderer.MARGIN) / (cellSize + BoardRenderer.GAP);
-                int targetRow = (boardPos.Y - BoardRenderer.MARGIN) / (cellSize + BoardRenderer.GAP);
-
-                if (targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol < 8)
+                if (pullDist < 20)
                 {
-                    hitValidBoardCell = true;
-                    flashingCells.Clear();
+                    HideDragGhost();
+                    UpdateItemUI();
+                    pnlBoard.Invalidate();
+                    return;
+                }
 
-                    switch (item.Type)
+                const double POWER_MULTIPLIER = 4.2;
+                int landScreenX = (int)(slingAnchor.X - pullDx * POWER_MULTIPLIER);
+                int landScreenY = (int)(slingAnchor.Y - pullDy * POWER_MULTIPLIER);
+                Point targetScreen = new Point(landScreenX, landScreenY);
+
+                Point boardPos = pnlBoard.PointToClient(targetScreen);
+                bool isHitBoard = pnlBoard.ClientRectangle.Contains(boardPos);
+
+                item.TryConsume();
+                gameManager.SaveItemsJson();
+                UpdateItemUI();
+
+                await FlyProjectileAsync(item, slingPullPos, targetScreen, arcHeight: 70);
+
+                int clearedCells = 0;
+                bool hitValidBoardCell = false;
+
+                if (isHitBoard)
+                {
+                    int cellSize = BoardRenderer.CalculateCellSize(pnlBoard.Size);
+                    int targetCol = (boardPos.X - BoardRenderer.MARGIN) / (cellSize + BoardRenderer.GAP);
+                    int targetRow = (boardPos.Y - BoardRenderer.MARGIN) / (cellSize + BoardRenderer.GAP);
+
+                    if (targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol < 8)
                     {
-                        case ItemType.Bomb3x3:
-                            for (int r = targetRow - 1; r <= targetRow + 1; r++)
-                                for (int c = targetCol - 1; c <= targetCol + 1; c++)
-                                    if (r >= 0 && r < 8 && c >= 0 && c < 8 && gameManager.Board.GetCell(r, c) != 0)
-                                        flashingCells.Add(new Point(c, r));
+                        hitValidBoardCell = true;
+                        flashingCells.Clear();
 
-                            clearedCells = gameManager.Board.ClearArea3x3(targetRow, targetCol);
-                            ShowFloatingText("TRÚNG ĐÍCH!", BoardRenderer.GetCellRect(targetRow, targetCol, cellSize).Location);
-                            break;
-
-                        case ItemType.CrossClear:
-                            for (int i = 0; i < 8; i++)
-                            {
-                                if (gameManager.Board.GetCell(targetRow, i) != 0) flashingCells.Add(new Point(i, targetRow));
-                                if (gameManager.Board.GetCell(i, targetCol) != 0) flashingCells.Add(new Point(targetCol, i));
-                            }
-                            clearedCells = gameManager.Board.ClearCross(targetRow, targetCol);
-                            ShowFloatingText("TRÚNG ĐÍCH!", BoardRenderer.GetCellRect(targetRow, targetCol, cellSize).Location);
-                            break;
-
-                        case ItemType.ColorLightning:
-                            int color = gameManager.Board.GetCell(targetRow, targetCol);
-                            if (color > 0)
-                            {
-                                for (int r = 0; r < 8; r++)
-                                    for (int c = 0; c < 8; c++)
-                                        if (gameManager.Board.GetCell(r, c) == color)
+                        switch (item.Type)
+                        {
+                            case ItemType.Bomb3x3:
+                                for (int r = targetRow - 1; r <= targetRow + 1; r++)
+                                    for (int c = targetCol - 1; c <= targetCol + 1; c++)
+                                        if (r >= 0 && r < 8 && c >= 0 && c < 8 && gameManager.Board.GetCell(r, c) != 0)
                                             flashingCells.Add(new Point(c, r));
 
-                                clearedCells = gameManager.Board.ClearColor(color);
-                                ShowFloatingText("SẤM SÉT TRÚNG MÀU!", BoardRenderer.GetCellRect(targetRow, targetCol, cellSize).Location);
-                            }
-                            else
+                                clearedCells = gameManager.Board.ClearArea3x3(targetRow, targetCol);
+                                ShowFloatingText("TRÚNG ĐÍCH!", BoardRenderer.GetCellRect(targetRow, targetCol, cellSize).Location);
+                                break;
+
+                            case ItemType.CrossClear:
+                                for (int i = 0; i < 8; i++)
+                                {
+                                    if (gameManager.Board.GetCell(targetRow, i) != 0) flashingCells.Add(new Point(i, targetRow));
+                                    if (gameManager.Board.GetCell(i, targetCol) != 0) flashingCells.Add(new Point(targetCol, i));
+                                }
+                                clearedCells = gameManager.Board.ClearCross(targetRow, targetCol);
+                                ShowFloatingText("TRÚNG ĐÍCH!", BoardRenderer.GetCellRect(targetRow, targetCol, cellSize).Location);
+                                break;
+
+                            case ItemType.ColorLightning:
+                                int color = gameManager.Board.GetCell(targetRow, targetCol);
+                                if (color > 0)
+                                {
+                                    for (int r = 0; r < 8; r++)
+                                        for (int c = 0; c < 8; c++)
+                                            if (gameManager.Board.GetCell(r, c) == color)
+                                                flashingCells.Add(new Point(c, r));
+
+                                    clearedCells = gameManager.Board.ClearColor(color);
+                                    ShowFloatingText("SẤM SÉT TRÚNG MÀU!", BoardRenderer.GetCellRect(targetRow, targetCol, cellSize).Location);
+                                }
+                                else
+                                {
+                                    ShowFloatingText("SÉT ĐÁNH VÀO Ô TRỐNG!", BoardRenderer.GetCellRect(targetRow, targetCol, cellSize).Location);
+                                }
+                                break;
+
+                            case ItemType.GravityFall:
+                                gameManager.Board.ApplyGravity();
+                                ShowFloatingText("KÍCH HOẠT TRỌNG LỰC!", new PointF(pnlBoard.Width / 2f, pnlBoard.Height / 2f));
+                                break;
+                        }
+
+                        if (!tutorialManager.IsTutorialActive && clearedCells > 0)
+                        {
+                            int scoreBonus = clearedCells * 5;
+                            gameManager.AddScore(scoreBonus);
+                            UpdateScoreLabels();
+                        }
+
+                        if (item.Type == ItemType.Bomb3x3) SoundManager.PlayBombExplosion();
+                        else if (item.Type == ItemType.CrossClear) SoundManager.PlayCrossLaser();
+                        else if (item.Type == ItemType.ColorLightning) SoundManager.PlayLightningStrike();
+                        else if (item.Type == ItemType.GravityFall) SoundManager.PlayGravitySlam();
+
+                        await PlayItemExplosionVfxAsync(item.Type, targetRow, targetCol, cellSize);
+                        flashingCells.Clear();
+
+                        // Chỉ mở khóa Huân chương Vũ khí khi CHƠI THẬT (Bỏ qua Tutorial)
+                        if (!tutorialManager.IsTutorialActive)
+                        {
+                            switch (item.Type)
                             {
-                                ShowFloatingText("SÉT ĐÁNH VÀO Ô TRỐNG!", BoardRenderer.GetCellRect(targetRow, targetCol, cellSize).Location);
+                                case ItemType.Bomb3x3: ScoreManager.UnlockMedal("WEAPON_BOMB"); break;
+                                case ItemType.CrossClear: ScoreManager.UnlockMedal("WEAPON_CROSS"); break;
+                                case ItemType.ColorLightning: ScoreManager.UnlockMedal("WEAPON_LIGHTNING"); break;
+                                case ItemType.GravityFall: ScoreManager.UnlockMedal("WEAPON_GRAVITY"); break;
                             }
-                            break;
+                            ScoreManager.CheckWeaponMaster();
+                        }
 
-                        case ItemType.GravityFall:
-                            gameManager.Board.ApplyGravity();
-                            ShowFloatingText("KÍCH HOẠT TRỌNG LỰC!", new PointF(pnlBoard.Width / 2f, pnlBoard.Height / 2f));
-                            break;
+                        if (item.Type == ItemType.GravityFall)
+                        {
+                            await AnimateLineClearAsync();
+                        }
+
+                        pnlBoard.Invalidate();
                     }
-
-                    // TÍNH ĐIỂM (Chỉ tính khi đang chơi thật, không tính trong Tutorial)
-                    if (!tutorialManager.IsTutorialActive && clearedCells > 0)
-                    {
-                        int scoreBonus = clearedCells * 5;
-                        gameManager.AddScore(scoreBonus);
-                        UpdateScoreLabels();
-                    }
-
-                    // Phát âm thanh đặc trưng riêng cho từng loại vũ khí
-                    if (item.Type == ItemType.Bomb3x3) SoundManager.PlayBombExplosion();
-                    else if (item.Type == ItemType.CrossClear) SoundManager.PlayCrossLaser();
-                    else if (item.Type == ItemType.ColorLightning) SoundManager.PlayLightningStrike();
-                    else if (item.Type == ItemType.GravityFall) SoundManager.PlayGravitySlam();
-
-                    // Chạy hoạt họa vụ nổ hoành tráng ngay trên bàn cờ
-                    await PlayItemExplosionVfxAsync(item.Type, targetRow, targetCol, cellSize);
-                    flashingCells.Clear();
-
-                    // NẾU LÀ TRỌNG LỰC: KIỂM TRA VÀ TỰ ĐỘNG NỔ CÁC DÒNG ĐẦY VỪA HÌNH THÀNH
-                    if (item.Type == ItemType.GravityFall)
-                    {
-                        await AnimateLineClearAsync();
-                    }
-
-                    pnlBoard.Invalidate();
-                }
-            }
-            // TRƯỜNG HỢP 2: BẮN HỤT (BAY RA NGOÀI MÉP BÀN CỜ)
-            else
-            {
-                ShowFloatingText("BẮN HỤT RA NGOÀI!", new PointF(pnlBoard.Width / 2f, pnlBoard.Height / 2f));
-                SoundManager.PlayDrop();
-            }
-
-            // XỬ LÝ TIẾN TRÌNH SAU KHI BẮN ITEM:
-            if (tutorialManager.IsTutorialActive)
-            {
-                bool tutorialSuccess = hitValidBoardCell && (clearedCells > 0 || item.Type == ItemType.GravityFall);
-                if (tutorialSuccess)
-                {
-                    // Bắn trúng mục tiêu trong Tutorial -> Chuyển sang màn Tutorial tiếp theo!
-                    await DelayAsync(400);
-                    HandleGameProgressionAfterMove();
                 }
                 else
                 {
-                    // Bắn hụt hoặc bắn vào ô trống không nổ viên gạch nào -> Hoàn lại 1 Item để bắn lại!
-                    item.Count = 1;
-                    UpdateItemUI();
-                    ShowFloatingText("Chưa trúng gạch!\nHãy kéo ngắm bắn lại nhé!", new PointF(pnlBoard.Width / 2f, pnlBoard.Height / 2f));
+                    ShowFloatingText("BẮN HỤT RA NGOÀI!", new PointF(pnlBoard.Width / 2f, pnlBoard.Height / 2f));
+                    SoundManager.PlayDrop();
+                }
+
+                if (tutorialManager.IsTutorialActive)
+                {
+                    bool tutorialSuccess = hitValidBoardCell && (clearedCells > 0 || item.Type == ItemType.GravityFall);
+                    if (tutorialSuccess)
+                    {
+                        ShowFloatingText("★ CHÍNH XÁC! MỤC TIÊU ĐÃ BỊ PHÁ HỦY!", new PointF(pnlBoard.Width / 2f, pnlBoard.Height / 2f));
+
+                        if (tutorialManager.NextLevel())
+                        {
+                            LoadPuzzleLevel();
+                        }
+                        else
+                        {
+                            if (lblTutorialGuide != null) lblTutorialGuide.Visible = false;
+                            tutorialManager.MarkTutorialCompleted();
+                            tutorialManager.IsTutorialActive = false;
+                            gameManager.ResetGame();
+                            gameManager.ResetAllItems();
+                            UpdateItemUI();
+                            GenerateNewPieces();
+                            pnlBoard.Invalidate();
+                            ShowFloatingText("★ XUẤT SẮC! BẠN ĐÃ HOÀN THÀNH TUTORIAL!", new PointF(pnlBoard.Width / 2f, pnlBoard.Height / 2f));
+                        }
+                    }
+                    else
+                    {
+                        item.Count = 1;
+                        gameManager.SaveItemsJson();
+                        UpdateItemUI();
+                        ShowFloatingText("CHƯA TRÚNG MỤC TIÊU!\nĐã hoàn lại Item, hãy kéo ná ngắm lại nhé!", new PointF(pnlBoard.Width / 2f, pnlBoard.Height / 2f));
+                    }
+                    return;
+                }
+                else
+                {
+                    CheckGameOver();
                 }
             }
-            else
+            catch (Exception ex)
             {
-                CheckGameOver();
+                System.Diagnostics.Debug.WriteLine($"[HandleItemDrop Error]: {ex.Message}");
+                HideDragGhost();
             }
-
-            isProcessingMove = false;
-            pnlBoard.Invalidate();
-            UpdateItemUI();
+            finally
+            {
+                isProcessingMove = false;
+                pnlBoard.Invalidate();
+                UpdateItemUI();
+            }
         }
 
         // Vẽ toàn bộ ná cao su, 2 sợi dây thun, quả đạn và chuỗi hạt đạn đạo trên toàn màn hình không bị clip
@@ -1882,7 +1868,7 @@ namespace BlockBlast
                 }
 
                 // Vẽ biểu tượng quả đạn vector GDI+ sắc nét không phụ thuộc emoji hệ điều hành
-                DrawItemProjectileIcon(g, draggingItem.Type, formPull.X, formPull.Y, 15f);
+                BoardRenderer.DrawItemProjectileIcon(g, draggingItem.Type, formPull.X, formPull.Y, 15f);
 
                 // 5. Cảnh báo độ căng tối đa
                 if (isTensionMax && tensionMaxStartTime != DateTime.MinValue)
@@ -1897,112 +1883,11 @@ namespace BlockBlast
                     }
                 }
 
-                if (dragGhost == null || dragGhost.IsDisposed) dragGhost = new DragGhostWindow { Owner = this };
+                if (dragGhost == null || dragGhost.IsDisposed) dragGhost = new DragGhostOverlay(this);
                 dragGhost.SetBitmap(bmp, formTopLeft);
             }
 
             if (!dragGhost.Visible) dragGhost.Show();
-        }
-
-        // Vẽ biểu tượng vũ khí vector GDI+ sắc nét không bao giờ bị lỗi font hệ điều hành
-        private void DrawItemProjectileIcon(Graphics g, ItemType type, float cx, float cy, float radius)
-        {
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-
-            if (type == ItemType.Bomb3x3)
-            {
-                // Quả bom tròn xám đen + ngòi nổ vàng cam
-                using (SolidBrush bombBrush = new SolidBrush(Color.FromArgb(36, 40, 52)))
-                {
-                    g.FillEllipse(bombBrush, cx - radius, cy - radius + 2, radius * 2, radius * 2);
-                }
-                using (Pen border = new Pen(Color.FromArgb(20, 22, 28), 1.5f))
-                {
-                    g.DrawEllipse(border, cx - radius, cy - radius + 2, radius * 2, radius * 2);
-                }
-                using (SolidBrush highlight = new SolidBrush(Color.FromArgb(140, 255, 255, 255)))
-                {
-                    g.FillEllipse(highlight, cx - radius * 0.5f, cy - radius * 0.5f, radius * 0.45f, radius * 0.45f);
-                }
-                using (Pen fusePen = new Pen(Color.FromArgb(210, 160, 90), 2f))
-                {
-                    g.DrawArc(fusePen, cx - 4, cy - radius - 5, 8, 8, 200, 140);
-                }
-                using (SolidBrush spark = new SolidBrush(Color.FromArgb(255, 120, 30)))
-                {
-                    g.FillEllipse(spark, cx + 1, cy - radius - 7, 5, 5);
-                }
-            }
-            else if (type == ItemType.CrossClear)
-            {
-                // Dấu cộng Tia Chữ Thập màu vàng kim rực sáng
-                float armLen = radius * 0.85f;
-                float armThick = radius * 0.45f;
-                using (SolidBrush brush = new SolidBrush(Color.FromArgb(255, 220, 60)))
-                {
-                    g.FillRectangle(brush, cx - armLen, cy - armThick / 2, armLen * 2, armThick);
-                    g.FillRectangle(brush, cx - armThick / 2, cy - armLen, armThick, armLen * 2);
-                }
-                using (Pen border = new Pen(Color.White, 1.2f))
-                {
-                    g.DrawRectangle(border, cx - armLen, cy - armThick / 2, armLen * 2, armThick);
-                    g.DrawRectangle(border, cx - armThick / 2, cy - armLen, armThick, armLen * 2);
-                }
-            }
-            else if (type == ItemType.ColorLightning)
-            {
-                // Tia sét ziczac màu vàng điện
-                PointF[] bolt = new PointF[]
-                {
-                    new PointF(cx + 1, cy - radius),
-                    new PointF(cx - radius * 0.75f, cy + 1),
-                    new PointF(cx - 1, cy + 1),
-                    new PointF(cx - 3, cy + radius),
-                    new PointF(cx + radius * 0.75f, cy - 1),
-                    new PointF(cx + 1, cy - 1)
-                };
-                using (SolidBrush boltBrush = new SolidBrush(Color.FromArgb(255, 230, 80)))
-                {
-                    g.FillPolygon(boltBrush, bolt);
-                }
-                using (Pen boltPen = new Pen(Color.White, 1.2f))
-                {
-                    g.DrawPolygon(boltPen, bolt);
-                }
-            }
-            else if (type == ItemType.GravityFall)
-            {
-                // Hai mũi tên kép hướng xuống màu xanh ngọc
-                PointF[] arrow1 = new PointF[]
-                {
-                    new PointF(cx - radius * 0.7f, cy - radius * 0.4f),
-                    new PointF(cx + radius * 0.7f, cy - radius * 0.4f),
-                    new PointF(cx, cy + 2)
-                };
-                PointF[] arrow2 = new PointF[]
-                {
-                    new PointF(cx - radius * 0.7f, cy + 1),
-                    new PointF(cx + radius * 0.7f, cy + 1),
-                    new PointF(cx, cy + radius * 0.9f)
-                };
-                using (SolidBrush arrowBrush = new SolidBrush(Color.FromArgb(46, 204, 113)))
-                {
-                    g.FillPolygon(arrowBrush, arrow1);
-                    g.FillPolygon(arrowBrush, arrow2);
-                }
-                using (Pen arrowPen = new Pen(Color.White, 1.0f))
-                {
-                    g.DrawPolygon(arrowPen, arrow1);
-                    g.DrawPolygon(arrowPen, arrow2);
-                }
-            }
-            else
-            {
-                using (Pen arcPen = new Pen(Color.FromArgb(52, 152, 219), 3f))
-                {
-                    g.DrawArc(arcPen, cx - radius * 0.6f, cy - radius * 0.6f, radius * 1.2f, radius * 1.2f, 30, 280);
-                }
-            }
         }
 
         // Vẽ dây thun đứt đôi giật ngược
@@ -2033,7 +1918,7 @@ namespace BlockBlast
                     g.DrawString("ĐỨT!", f, b, mid.X, mid.Y - 15);
                 }
 
-                if (dragGhost == null || dragGhost.IsDisposed) dragGhost = new DragGhostWindow { Owner = this };
+                if (dragGhost == null || dragGhost.IsDisposed) dragGhost = new DragGhostOverlay(this);
                 dragGhost.SetBitmap(bmp, formTopLeft);
             }
             if (!dragGhost.Visible) dragGhost.Show();
@@ -2042,7 +1927,7 @@ namespace BlockBlast
         // Hoạt họa quả bom thực sự bay theo đường cong Parabol từ ná đến điểm rơi trên bàn cờ
         private async Task FlyProjectileAsync(Item item, Point startScreen, Point targetScreen, int arcHeight = 70)
         {
-            if (dragGhost == null || dragGhost.IsDisposed) dragGhost = new DragGhostWindow { Owner = this };
+            if (dragGhost == null || dragGhost.IsDisposed) dragGhost = new DragGhostOverlay(this);
 
             int pSize = 80;
             using (Bitmap bombBmp = new Bitmap(pSize, pSize, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
@@ -2062,7 +1947,7 @@ namespace BlockBlast
                         g.DrawEllipse(borderPen, cx - 22, cy - 22, 44, 44);
                     }
 
-                    DrawItemProjectileIcon(g, item.Type, cx, cy, 14f);
+                    BoardRenderer.DrawItemProjectileIcon(g, item.Type, cx, cy, 14f);
                 }
 
                 const int steps = 15; // 15 khung hình ~ 240ms mượt mà
@@ -2308,6 +2193,629 @@ namespace BlockBlast
             SoundManager.IsMuted = !SoundManager.IsMuted;
             ScoreManager.SaveAudioSettings(SoundManager.IsMuted);
             btnSound.Text = SoundManager.IsMuted ? "LOA: TẮT" : "LOA: BẬT";
+        }
+
+        // Kích hoạt cờ WS_EX_COMPOSITED (0x02000000) giúp Windows vẽ mượt mà toàn bộ các lớp control từ dưới lên trên
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams cp = base.CreateParams;
+                cp.ExStyle |= 0x02000000; // WS_EX_COMPOSITED
+                return cp;
+            }
+        }
+        // ================================================================
+        //  KHỞI TẠO POPUP THÔNG TIN NHÓM (CHUYỂN TỪ FORMCREDITS VÀO 1 FORM)
+        // ================================================================
+        private void InitAboutDialog()
+        {
+            if (pnlAbout == null) return;
+
+            pnlAbout.Controls.Clear();
+            pnlAbout.Parent = this;
+            pnlAbout.Visible = false;
+            pnlAbout.BackColor = Color.FromArgb(22, 26, 42);
+            pnlAbout.Size = new Size(680, 540);
+
+            // 1. Tiêu đề chính và phụ
+            Label lblTitle = new Label
+            {
+                Text = "BLOCK BLAST",
+                Font = new Font("Segoe UI", 20F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(255, 159, 67),
+                Location = new Point(24, 16),
+                AutoSize = true
+            };
+
+            Label lblSubtitle = new Label
+            {
+                Text = "Giới thiệu dự án & nhóm phát triển (Nhóm: " + CreditsContent.TeamName + ")",
+                Font = new Font("Segoe UI", 10F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(174, 184, 207),
+                Location = new Point(26, 52),
+                AutoSize = true
+            };
+
+            // 2. TabControl với 4 Tab thông tin (chia đều 100% chiều ngang)
+            int tabAreaWidth = pnlAbout.Width - 48;
+            int tabItemWidth = (tabAreaWidth - 4) / 4; // Chia đều cho 4 Tab không để khe trắng
+
+            TabControl tabCredits = new TabControl
+            {
+                Location = new Point(24, 82),
+                Size = new Size(tabAreaWidth, pnlAbout.Height - 146),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+                DrawMode = TabDrawMode.OwnerDrawFixed,
+                SizeMode = TabSizeMode.Fixed,
+                ItemSize = new Size(tabItemWidth, 34)
+            };
+
+            // Thứ tự hiển thị: 1. Luật chơi -> 2. Sáng tạo -> 3. Thành viên -> 4. Động lực
+            TabPage tabGuide = new TabPage("Luật chơi") { BackColor = Color.FromArgb(29, 34, 52) };
+            TabPage tabInnovation = new TabPage("Sáng tạo") { BackColor = Color.FromArgb(29, 34, 52) };
+            TabPage tabTeam = new TabPage("Thành viên") { BackColor = Color.FromArgb(29, 34, 52) };
+            TabPage tabMotivation = new TabPage("Động lực") { BackColor = Color.FromArgb(29, 34, 52) };
+
+            // Nội dung Tab 1: Luật chơi (có đệm viền lùi vào trong)
+            tabGuide.Controls.Add(CreateCreditsContentPanel(CreditsNarrative.Guide));
+
+            // Nội dung Tab 2: Sáng tạo (có đệm viền lùi vào trong)
+            tabInnovation.Controls.Add(CreateCreditsContentPanel(CreditsNarrative.Innovation));
+
+            // Nội dung Tab 3: Bảng Thành viên nhóm (căn chỉnh chuẩn, khóa kéo lệch ô)
+            Panel pnlTeamWrap = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(16, 14, 16, 14),
+                BackColor = Color.FromArgb(29, 34, 52)
+            };
+
+            DataGridView dgvMembers = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AutoGenerateColumns = false,
+                ReadOnly = true,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToResizeColumns = false, // KHÓA KÉO LỆCH CỘT
+                AllowUserToResizeRows = false,    // KHÓA KÉO LỆCH DÒNG
+                RowHeadersVisible = false,
+                BackgroundColor = Color.FromArgb(29, 34, 52),
+                BorderStyle = BorderStyle.None,
+                GridColor = Color.FromArgb(60, 69, 93),
+                EnableHeadersVisualStyles = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                ColumnHeadersHeight = 42,
+                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false
+            };
+            dgvMembers.RowTemplate.Height = 44;
+
+            dgvMembers.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(42, 48, 70);
+            dgvMembers.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(255, 180, 80);
+            dgvMembers.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            dgvMembers.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            dgvMembers.DefaultCellStyle.BackColor = Color.FromArgb(29, 34, 52);
+            dgvMembers.DefaultCellStyle.ForeColor = Color.FromArgb(232, 236, 244);
+            dgvMembers.DefaultCellStyle.SelectionBackColor = Color.FromArgb(50, 62, 88);
+            dgvMembers.DefaultCellStyle.SelectionForeColor = Color.White;
+            dgvMembers.DefaultCellStyle.Font = new Font("Segoe UI", 9.5F);
+
+            // Cột 1: Họ tên (40% - căn trái)
+            var colName = new DataGridViewTextBoxColumn
+            {
+                HeaderText = "Họ tên",
+                DataPropertyName = "FullName",
+                FillWeight = 40F
+            };
+            colName.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            colName.DefaultCellStyle.Padding = new Padding(14, 0, 0, 0);
+
+            // Cột 2: MSSV (30% - căn giữa)
+            var colId = new DataGridViewTextBoxColumn
+            {
+                HeaderText = "MSSV",
+                DataPropertyName = "StudentId",
+                FillWeight = 30F
+            };
+            colId.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            // Cột 3: Phụ trách (30% - căn giữa)
+            var colRole = new DataGridViewTextBoxColumn
+            {
+                HeaderText = "Phụ trách",
+                DataPropertyName = "Role",
+                FillWeight = 30F
+            };
+            colRole.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            dgvMembers.Columns.AddRange(new DataGridViewColumn[] { colName, colId, colRole });
+            dgvMembers.DataSource = CreditsContent.Members;
+            pnlTeamWrap.Controls.Add(dgvMembers);
+            tabTeam.Controls.Add(pnlTeamWrap);
+
+            // Nội dung Tab 4: Động lực (có đệm viền lùi vào trong)
+            tabMotivation.Controls.Add(CreateCreditsContentPanel(CreditsNarrative.Motivation));
+
+            // Thêm các Tab vào TabControl theo thứ tự mới
+            tabCredits.TabPages.Add(tabGuide);
+            tabCredits.TabPages.Add(tabInnovation);
+            tabCredits.TabPages.Add(tabTeam);
+            tabCredits.TabPages.Add(tabMotivation);
+
+            // Tự vẽ Tab cho đồng bộ Dark Neon Theme
+            tabCredits.DrawItem += (s, ev) =>
+            {
+                if (ev.Index < 0) return;
+                bool selected = ev.Index == tabCredits.SelectedIndex;
+                Color bg = selected ? Color.FromArgb(255, 159, 67) : Color.FromArgb(42, 48, 70);
+                Color fg = selected ? Color.FromArgb(22, 26, 42) : Color.FromArgb(232, 236, 244);
+                using (SolidBrush brush = new SolidBrush(bg)) ev.Graphics.FillRectangle(brush, ev.Bounds);
+                TextRenderer.DrawText(ev.Graphics, tabCredits.TabPages[ev.Index].Text, tabCredits.Font, ev.Bounds, fg,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+
+            // 3. Nút Đóng
+            Button btnClose = new Button
+            {
+                Text = "ĐÓNG",
+                Size = new Size(110, 36),
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
+                Location = new Point(pnlAbout.Width - 134, pnlAbout.Height - 48),
+                BackColor = Color.FromArgb(255, 159, 67),
+                ForeColor = Color.FromArgb(22, 26, 42),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnClose.FlatAppearance.BorderSize = 0;
+            btnClose.Click += btnCloseAbout_Click;
+            BoardRenderer.ApplyRoundedRegion(btnClose, 10);
+
+            // Vẽ viền bo góc phát sáng cho pnlAbout
+            pnlAbout.Paint += (s, ev) =>
+            {
+                using (var path = BoardRenderer.CreateRoundedPath(new Rectangle(1, 1, pnlAbout.Width - 3, pnlAbout.Height - 3), 16))
+                using (Pen borderPen = new Pen(Color.FromArgb(140, 255, 159, 67), 2f))
+                {
+                    ev.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    ev.Graphics.DrawPath(borderPen, path);
+                }
+            };
+
+            pnlAbout.Controls.Add(lblTitle);
+            pnlAbout.Controls.Add(lblSubtitle);
+            pnlAbout.Controls.Add(tabCredits);
+            pnlAbout.Controls.Add(btnClose);
+            BoardRenderer.ApplyRoundedRegion(pnlAbout, 16);
+        }
+
+        // Tạo khung chứa RichTextBox có khoảng đệm Padding không bị sát viền
+        private Control CreateCreditsContentPanel(CreditsSection[] sections)
+        {
+            Panel pnlWrap = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(18, 14, 18, 14),
+                BackColor = Color.FromArgb(29, 34, 52)
+            };
+
+            RichTextBox box = new RichTextBox
+            {
+                Dock = DockStyle.Fill,
+                ReadOnly = true,
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(29, 34, 52),
+                ForeColor = Color.FromArgb(232, 236, 244),
+                Font = new Font("Segoe UI", 9.5F),
+                ScrollBars = RichTextBoxScrollBars.Vertical
+            };
+
+            FillCreditsSections(box, sections);
+            pnlWrap.Controls.Add(box);
+            return pnlWrap;
+        }
+
+        private static void FillCreditsSections(RichTextBox box, CreditsSection[] sections)
+        {
+            box.Clear();
+            using (Font headingFont = new Font(box.Font.FontFamily, 12F, FontStyle.Bold))
+            {
+                foreach (CreditsSection section in sections)
+                {
+                    box.SelectionStart = box.TextLength;
+                    box.SelectionLength = 0;
+                    box.SelectionFont = headingFont;
+                    box.SelectionColor = Color.FromArgb(255, 159, 67);
+                    box.AppendText(section.Title + "\r\n");
+
+                    box.SelectionFont = box.Font;
+                    box.SelectionColor = Color.FromArgb(232, 236, 244);
+                    box.AppendText(section.Body + "\r\n\r\n");
+                }
+            }
+            box.SelectionStart = 0;
+            box.ScrollToCaret();
+        }
+
+        private RichTextBox CreateCreditsTextBox()
+        {
+            return new RichTextBox
+            {
+                Dock = DockStyle.Fill,
+                ReadOnly = true,
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(29, 34, 52),
+                ForeColor = Color.FromArgb(232, 236, 244),
+                Font = new Font("Segoe UI", 9.5F)
+            };
+        }
+        // ================================================================
+        //  KHỞI TẠO POPUP NHẬT KÝ CHIẾN TÍCH & BỘ SƯU TẬP HUÂN CHƯƠNG
+        // ================================================================
+
+        private void InitLeaderboardButtons()
+        {
+            if (pnlMainMenu != null && btnMenuLeaderboard == null)
+            {
+                btnMenuLeaderboard = new Button
+                {
+                    Text = "CHIẾN TÍCH",
+                    Size = new Size(280, 40),
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                    ForeColor = Color.White,
+                    BackColor = Color.FromArgb(40, 45, 66),
+                    Cursor = Cursors.Hand
+                };
+                btnMenuLeaderboard.FlatAppearance.BorderSize = 0;
+                btnMenuLeaderboard.Click += (s, ev) => ShowLeaderboardDialog();
+                pnlMainMenu.Controls.Add(btnMenuLeaderboard);
+            }
+        }
+
+        private void ShowLeaderboardDialog()
+        {
+            if (pnlLeaderboard == null) InitLeaderboardDialog();
+            // Ghi nhớ: Dialog này được mở từ Menu Tạm dừng (Pause) hay từ Menu chính
+            isDialogOpenedFromPause = (pnlPause != null && pnlPause.Visible);
+            if (pnlMainMenu != null) pnlMainMenu.Visible = false;
+            if (pnlPause != null) pnlPause.Visible = false;
+            pnlLeaderboard.Parent = this;
+            int dialogW = Math.Min(920, Math.Max(600, this.ClientSize.Width - 40));
+            int dialogH = Math.Min(620, Math.Max(500, this.ClientSize.Height - 40));
+            pnlLeaderboard.Size = new Size(dialogW, dialogH);
+            pnlLeaderboard.Location = new Point(
+                (this.ClientSize.Width - pnlLeaderboard.Width) / 2,
+                (this.ClientSize.Height - pnlLeaderboard.Height) / 2
+            );
+            RefreshLeaderboardData();
+            BoardRenderer.ApplyRoundedRegion(pnlLeaderboard, 16);
+            pnlLeaderboard.Visible = true;
+            pnlLeaderboard.BringToFront();
+            pnlLeaderboard.Invalidate();
+        }
+
+        private DataGridView dgvMatchHistory;
+        private TableLayoutPanel pnlMedalsGrid;
+        private Label lblStatBestScore;
+        private Label lblStatTotalMatches;
+        private Label lblStatMedalCount;
+
+        private void InitLeaderboardDialog()
+        {
+            if (pnlLeaderboard != null) return;
+
+            pnlLeaderboard = new Panel
+            {
+                Parent = this,
+                Visible = false,
+                BackColor = Color.FromArgb(22, 26, 42),
+                Size = new Size(920, 620)
+            };
+
+            // 1. Tiêu đề
+            Label lblTitle = new Label
+            {
+                Text = "NHẬT KÝ CHIẾN TÍCH",
+                Font = new Font("Segoe UI", 20F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(255, 204, 77),
+                Location = new Point(24, 16),
+                AutoSize = true
+            };
+
+            Label lblSubtitle = new Label
+            {
+                Text = "Hồ sơ thành tích cá nhân & Tủ trưng bày huân chương danh dự",
+                Font = new Font("Segoe UI", 10F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(174, 184, 207),
+                Location = new Point(26, 52),
+                AutoSize = true
+            };
+
+            // 2. TabControl với 2 Tab (Chia đều 50% - 50%)
+            int tabAreaWidth = pnlLeaderboard.Width - 48;
+            int tabItemWidth = (tabAreaWidth - 4) / 2;
+
+            TabControl tabRecords = new TabControl
+            {
+                Location = new Point(24, 82),
+                Size = new Size(tabAreaWidth, pnlLeaderboard.Height - 146),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+                DrawMode = TabDrawMode.OwnerDrawFixed,
+                SizeMode = TabSizeMode.Fixed,
+                ItemSize = new Size(tabItemWidth, 34)
+            };
+
+            TabPage tabProfile = new TabPage("Hồ Sơ Cá Nhân & Lịch Sử Đấu") { BackColor = Color.FromArgb(29, 34, 52) };
+            TabPage tabMedals = new TabPage("Tủ Trưng Bày 12 Huân Chương") { BackColor = Color.FromArgb(29, 34, 52) };
+
+            // === TAB 1: HỒ SƠ & LỊCH SỬ ===
+            Panel pnlProfileWrap = new Panel { Dock = DockStyle.Fill, Padding = new Padding(14, 10, 14, 10), BackColor = Color.FromArgb(29, 34, 52) };
+
+            // 3 Thẻ chỉ số cá nhân ở phía trên
+            Panel pnlStatsBar = new Panel { Dock = DockStyle.Top, Height = 74, BackColor = Color.Transparent };
+            int cardW = (tabAreaWidth - 28 - 24) / 3;
+
+            Panel card1 = CreateStatCard("🏆 KỶ LỤC CAO NHẤT", "0 điểm", out lblStatBestScore, new Point(0, 0), cardW);
+            Panel card2 = CreateStatCard("🎮 TỔNG SỐ VÁN ĐẤU", "0 ván", out lblStatTotalMatches, new Point(cardW + 12, 0), cardW);
+            Panel card3 = CreateStatCard("🏅 HUÂN CHƯƠNG ĐÃ ĐẠT", "0 / 12", out lblStatMedalCount, new Point((cardW + 12) * 2, 0), cardW);
+
+            pnlStatsBar.Controls.Add(card1);
+            pnlStatsBar.Controls.Add(card2);
+            pnlStatsBar.Controls.Add(card3);
+
+            // Bảng lịch sử ván đấu ở phía dưới
+            dgvMatchHistory = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AutoGenerateColumns = false,
+                ReadOnly = true,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToResizeColumns = false,
+                AllowUserToResizeRows = false,
+                RowHeadersVisible = false,
+                BackgroundColor = Color.FromArgb(29, 34, 52),
+                BorderStyle = BorderStyle.None,
+                GridColor = Color.FromArgb(60, 69, 93),
+                EnableHeadersVisualStyles = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                ColumnHeadersHeight = 38,
+                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false
+            };
+            dgvMatchHistory.RowTemplate.Height = 36;
+            dgvMatchHistory.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(42, 48, 70);
+            dgvMatchHistory.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(255, 204, 77);
+            dgvMatchHistory.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+            dgvMatchHistory.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            dgvMatchHistory.DefaultCellStyle.BackColor = Color.FromArgb(29, 34, 52);
+            dgvMatchHistory.DefaultCellStyle.ForeColor = Color.FromArgb(232, 236, 244);
+            dgvMatchHistory.DefaultCellStyle.SelectionBackColor = Color.FromArgb(50, 62, 88);
+            dgvMatchHistory.DefaultCellStyle.SelectionForeColor = Color.White;
+
+            var colMatch = new DataGridViewTextBoxColumn { HeaderText = "Ván Đấu", FillWeight = 16F };
+            colMatch.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            var colScore = new DataGridViewTextBoxColumn { HeaderText = "Điểm Đạt Được", FillWeight = 26F };
+            colScore.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colScore.DefaultCellStyle.ForeColor = Color.FromArgb(255, 204, 77);
+
+            var colTier = new DataGridViewTextBoxColumn { HeaderText = "Xếp Loại Cấp Độ", FillWeight = 32F };
+            colTier.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            var colDate = new DataGridViewTextBoxColumn { HeaderText = "Thời Gian Chơi", FillWeight = 26F };
+            colDate.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            dgvMatchHistory.Columns.AddRange(new DataGridViewColumn[] { colMatch, colScore, colTier, colDate });
+
+            Panel pnlTableContainer = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 10, 0, 0) };
+            pnlTableContainer.Controls.Add(dgvMatchHistory);
+
+            pnlProfileWrap.Controls.Add(pnlTableContainer);
+            pnlProfileWrap.Controls.Add(pnlStatsBar);
+            tabProfile.Controls.Add(pnlProfileWrap);
+
+            // === TAB 2: TỦ TRƯNG BÀY HUÂN CHƯƠNG (LƯỚI 4 CỘT x 3 DÒNG KHÔNG CUỘN) ===
+            Panel pnlMedalsWrap = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 10, 12, 10), BackColor = Color.FromArgb(29, 34, 52) };
+
+            pnlMedalsGrid = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 4,
+                RowCount = 3,
+                BackColor = Color.Transparent
+            };
+            for (int i = 0; i < 4; i++) pnlMedalsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            for (int i = 0; i < 3; i++) pnlMedalsGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33F));
+
+            pnlMedalsWrap.Controls.Add(pnlMedalsGrid);
+            tabMedals.Controls.Add(pnlMedalsWrap);
+
+            tabRecords.TabPages.Add(tabProfile);
+            tabRecords.TabPages.Add(tabMedals);
+
+            tabRecords.DrawItem += (s, ev) =>
+            {
+                if (ev.Index < 0) return;
+                bool selected = ev.Index == tabRecords.SelectedIndex;
+                Color bg = selected ? Color.FromArgb(255, 204, 77) : Color.FromArgb(42, 48, 70);
+                Color fg = selected ? Color.FromArgb(22, 26, 42) : Color.FromArgb(232, 236, 244);
+                using (SolidBrush brush = new SolidBrush(bg)) ev.Graphics.FillRectangle(brush, ev.Bounds);
+                TextRenderer.DrawText(ev.Graphics, tabRecords.TabPages[ev.Index].Text, tabRecords.Font, ev.Bounds, fg,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+
+            // 3. Nút Đóng
+            Button btnClose = new Button
+            {
+                Text = "ĐÓNG",
+                Size = new Size(110, 36),
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
+                Location = new Point(pnlLeaderboard.Width - 134, pnlLeaderboard.Height - 48),
+                BackColor = Color.FromArgb(255, 204, 77),
+                ForeColor = Color.FromArgb(22, 26, 42),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnClose.FlatAppearance.BorderSize = 0;
+            btnClose.Click += btnCloseLeaderboard_Click;
+            BoardRenderer.ApplyRoundedRegion(btnClose, 10);
+
+            pnlLeaderboard.Paint += (s, ev) =>
+            {
+                using (var path = BoardRenderer.CreateRoundedPath(new Rectangle(1, 1, pnlLeaderboard.Width - 3, pnlLeaderboard.Height - 3), 16))
+                using (Pen borderPen = new Pen(Color.FromArgb(140, 255, 204, 77), 2f))
+                {
+                    ev.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    ev.Graphics.DrawPath(borderPen, path);
+                }
+            };
+
+            pnlLeaderboard.Controls.Add(lblTitle);
+            pnlLeaderboard.Controls.Add(lblSubtitle);
+            pnlLeaderboard.Controls.Add(tabRecords);
+            pnlLeaderboard.Controls.Add(btnClose);
+            BoardRenderer.ApplyRoundedRegion(pnlLeaderboard, 16);
+        }
+
+        private Panel CreateStatCard(string header, string value, out Label lblVal, Point loc, int width)
+        {
+            Panel card = new Panel
+            {
+                Size = new Size(width, 70),
+                Location = loc,
+                BackColor = Color.FromArgb(22, 26, 42)
+            };
+            Label lblHead = new Label
+            {
+                Text = header,
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(174, 184, 207),
+                Location = new Point(8, 8),
+                AutoSize = true
+            };
+            lblVal = new Label
+            {
+                Text = value,
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(255, 204, 77),
+                Location = new Point(8, 30),
+                AutoSize = true
+            };
+            card.Controls.Add(lblHead);
+            card.Controls.Add(lblVal);
+            BoardRenderer.ApplyRoundedRegion(card, 10);
+            return card;
+        }
+
+        private void RefreshLeaderboardData()
+        {
+            var matches = ScoreManager.LoadMatchHistory();
+            var medals = ScoreManager.LoadMedals();
+            int bestScore = ScoreManager.LoadSavedHighScore();
+
+            // 1. Cập nhật 3 Thẻ thống kê
+            if (lblStatBestScore != null) lblStatBestScore.Text = $"{bestScore:N0} điểm";
+            if (lblStatTotalMatches != null) lblStatTotalMatches.Text = $"{matches.Count} ván đấu";
+            if (lblStatMedalCount != null)
+            {
+                int unlockedCount = medals.Count(m => m.IsUnlocked);
+                lblStatMedalCount.Text = $"{unlockedCount} / {medals.Count} Huân chương";
+            }
+
+            // 2. Cập nhật bảng lịch sử ván đấu
+            if (dgvMatchHistory != null)
+            {
+                dgvMatchHistory.Rows.Clear();
+                foreach (var m in matches.Take(15))
+                {
+                    dgvMatchHistory.Rows.Add($"Ván #{m.MatchIndex}", $"{m.Score:N0}", m.RankTier, m.Date.ToString("dd/MM/yyyy HH:mm"));
+                }
+            }
+
+            // 3. Cập nhật Tủ trưng bày 12 Huân chương (Lưới 4x3 vừa vặn)
+            if (pnlMedalsGrid != null)
+            {
+                pnlMedalsGrid.Controls.Clear();
+                foreach (var medal in medals)
+                {
+                    Panel card = new Panel
+                    {
+                        Dock = DockStyle.Fill,
+                        Margin = new Padding(4),
+                        BackColor = medal.IsUnlocked ? Color.FromArgb(36, 44, 70) : Color.FromArgb(20, 23, 34)
+                    };
+
+                    Label lblIcon = new Label
+                    {
+                        Text = medal.Icon,
+                        Font = new Font("Segoe UI", 20F),
+                        Location = new Point(4, 8),
+                        Size = new Size(42, 42),
+                        TextAlign = ContentAlignment.MiddleCenter
+                    };
+
+                    Label lblName = new Label
+                    {
+                        Text = medal.Title,
+                        Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                        ForeColor = medal.IsUnlocked ? Color.FromArgb(255, 204, 77) : Color.FromArgb(120, 125, 145),
+                        Location = new Point(48, 6),
+                        Size = new Size(150, 18)
+                    };
+
+                    Label lblDesc = new Label
+                    {
+                        Text = medal.Description,
+                        Font = new Font("Segoe UI", 7.5F),
+                        ForeColor = medal.IsUnlocked ? Color.FromArgb(190, 200, 225) : Color.FromArgb(80, 85, 105),
+                        Location = new Point(48, 24),
+                        Size = new Size(150, 28)
+                    };
+
+                    Label lblStatus = new Label
+                    {
+                        Text = medal.IsUnlocked ? $"★ {medal.UnlockedDate:dd/MM}" : "🔒 CHƯA ĐẠT",
+                        Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
+                        ForeColor = medal.IsUnlocked ? Color.FromArgb(46, 204, 113) : Color.FromArgb(100, 105, 125),
+                        Location = new Point(48, 52),
+                        AutoSize = true
+                    };
+
+                    card.Controls.Add(lblIcon);
+                    card.Controls.Add(lblName);
+                    card.Controls.Add(lblDesc);
+                    card.Controls.Add(lblStatus);
+                    BoardRenderer.ApplyRoundedRegion(card, 8);
+                    pnlMedalsGrid.Controls.Add(card);
+                }
+            }
+        }
+
+        private void btnCloseLeaderboard_Click(object sender, EventArgs e)
+        {
+            if (pnlLeaderboard != null) pnlLeaderboard.Visible = false;
+            // Nếu mở từ Menu Tạm dừng thì quay lại Pause; nếu mở từ Menu chính thì quay về Menu chính
+            if (isDialogOpenedFromPause)
+            {
+                if (pnlPause != null)
+                {
+                    pnlPause.Visible = true;
+                    pnlPause.BringToFront();
+                }
+            }
+            else
+            {
+                ShowMainMenu();
+            }
         }
     }
 }

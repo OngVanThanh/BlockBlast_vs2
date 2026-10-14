@@ -1,31 +1,60 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace BlockBlast.Module
 {
-    // Class chứa dữ liệu của từng màn Hướng dẫn / Puzzle
+    // Class chứa dữ liệu của từng màn Hướng dẫn / Puzzle (Mô hình 2 Pha)
     public class TutorialStep
     {
         public string Title { get; set; }
         public string Instruction { get; set; }
+
+        // Pha 1: Bố cục gạch và khối cần đặt để nổ combo
         public int[,] BoardLayout { get; set; }
         public int[,] DockPieceShape { get; set; }
         public int ColorIndex { get; set; }
-
-        // Tọa độ bắt buộc phải đặt khối (nếu = -1 là không khóa tọa độ cố định)
         public int TargetRow { get; set; } = -1;
         public int TargetCol { get; set; } = -1;
+    
+ 
+        // Item được thưởng khi làm nổ combo thành công
+        public ItemType? RewardedItem { get; set; } = null;
+        public ItemType? RequiredItem => RewardedItem;
 
-        // Nếu màn này dạy dùng Item thì gán loại Item cần cấp cho người chơi thử
-        public ItemType? RequiredItem { get; set; } = null;
+
+        // Pha 2: Bố cục mục tiêu sinh ra ngay sau khi nổ để người chơi kéo ná bắn thực hành
+        public int[,] TargetBoardLayout { get; set; } = null;
+        public string PracticeInstruction { get; set; } = null;
+
     }
 
-    // Class quản lý tiến trình các màn chơi
     public class TutorialManager
     {
         public int CurrentLevelIndex { get; private set; } = 0;
         public bool IsTutorialActive { get; set; } = true;
 
+        // Pha hiện tại của màn chơi: 1 = Đặt gạch tạo Combo nhận Item; 2 = Kéo ná bắn Item thực hành
+        public int CurrentPhase { get; set; } = 1;
+
         private readonly List<TutorialStep> levels = new List<TutorialStep>();
+
+        private string GetTutorialDoneFilePath()
+        {
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tutorial_done.txt");
+        }
+
+        // Kiểm tra đã hoàn thành Tutorial trước đó chưa (Chống lỗi lặp Tutorial)
+        public bool IsTutorialCompleted => File.Exists(GetTutorialDoneFilePath());
+
+        public void MarkTutorialCompleted()
+        {
+            try
+            {
+                File.WriteAllText(GetTutorialDoneFilePath(), "completed");
+            }
+            catch { }
+        }
 
         public TutorialManager()
         {
@@ -35,164 +64,115 @@ namespace BlockBlast.Module
         private void InitPuzzleLevels()
         {
             // ==========================================
-            // MÀN 1: HÌNH CHỮ THẬP (Thả khối 2x2 vào tâm nổ 2 hàng + 2 cột)
+            // MÀN 1: TẠO & BẮN TIA CHỮ THẬP (CROSS CLEAR)
             // ==========================================
             int[,] board1 = new int[8, 8];
             for (int i = 0; i < 8; i++)
             {
-                board1[3, i] = 1; // Hàng 3
-                board1[4, i] = 1; // Hàng 4
-                board1[i, 3] = 1; // Cột 3
-                board1[i, 4] = 1; // Cột 4
+                board1[3, i] = 1; board1[4, i] = 1;
+                board1[i, 3] = 1; board1[i, 4] = 1;
             }
-            // Đục lỗ ở giữa tâm (2x2)
             board1[3, 3] = 0; board1[3, 4] = 0;
             board1[4, 3] = 0; board1[4, 4] = 0;
 
+            // Mục tiêu thực hành bắn chữ thập
+            int[,] target1 = new int[8, 8];
+            for (int i = 0; i < 8; i++) { target1[3, i] = 4; target1[i, 3] = 4; }
+
             levels.Add(new TutorialStep
             {
-                Title = "Màn 1: Chữ Thập Combo",
-                Instruction = "Kéo khối 2x2 thả vào TÂM chữ thập để nổ Combo!",
+                Title = "Màn 1/4: Tạo & Dùng Tia Chữ Thập",
+                Instruction = "Thả khối 2x2 vào TÂM chữ thập để nổ 2 hàng & 2 cột -> Nhận TIA CHỮ THẬP!",
                 BoardLayout = board1,
                 DockPieceShape = new int[,] { { 1, 1 }, { 1, 1 } },
                 ColorIndex = 2,
                 TargetRow = 3,
-                TargetCol = 3
+                TargetCol = 3,
+                RewardedItem = ItemType.CrossClear,
+                TargetBoardLayout = target1,
+                PracticeInstruction = "★ ĐÃ NHẬN TIA CHỮ THẬP! Kéo căng ná bắn trúng tâm để quét sạch 2 hàng gạch!"
             });
 
             // ==========================================
-            // MÀN 2: LẤP ĐẦY KHUNG (Thả khối 1x4 để ăn dòng ngang)
+            // MÀN 2: TẠO & BẮN BOM 3x3 (BOMB 3x3)
             // ==========================================
             int[,] board2 = new int[8, 8];
-            for (int c = 0; c < 8; c++)
-            {
-                if (c < 2 || c > 5) board2[2, c] = 3;
-            }
-
-            levels.Add(new TutorialStep
-            {
-                Title = "Màn 2: Lấp Đầy Khe Mới",
-                Instruction = "Đặt khối 1x4 vào khe hở để hoàn thành hàng ngang!",
-                BoardLayout = board2,
-                DockPieceShape = new int[,] { { 1, 1, 1, 1 } },
-                ColorIndex = 4,
-                TargetRow = 2,
-                TargetCol = 2
-            });
-
-            // ==========================================
-            // MÀN 3: SIÊU COMBO 3 HÀNG (Thả khối 3x3 vào góc [1,1])
-            // ==========================================
-            int[,] board3 = new int[8, 8];
             for (int r = 1; r <= 3; r++)
-            {
                 for (int c = 0; c < 8; c++)
-                {
-                    // Đổ đầy 3 hàng (hàng 1, 2, 3), CHỈ để trống vùng 3x3 từ hàng 1-3, cột 1-3
-                    if (!(c >= 1 && c <= 3))
-                    {
-                        board3[r, c] = 5;
-                    }
-                }
-            }
+                    if (!(c >= 1 && c <= 3)) board2[r, c] = 5;
+
+            // Cụm gạch 3x3 mục tiêu sinh ra để bắn bom
+            int[,] target2 = new int[8, 8];
+            for (int r = 2; r <= 4; r++)
+                for (int c = 2; c <= 4; c++) target2[r, c] = 1;
 
             levels.Add(new TutorialStep
             {
-                Title = "Màn 3: Siêu Combo Mega",
-                Instruction = "Thả khối 3x3 vào góc trống để nổ tung 3 hàng cùng lúc!",
-                BoardLayout = board3,
+                Title = "Màn 2/4: Tạo & Dùng Bom 3x3",
+                Instruction = "Đặt khối 3x3 vào góc trống để nổ 3 hàng cùng lúc -> Nhận BOM 3x3!",
+                BoardLayout = board2,
                 DockPieceShape = new int[,] { { 1, 1, 1 }, { 1, 1, 1 }, { 1, 1, 1 } },
                 ColorIndex = 1,
                 TargetRow = 1,
-                TargetCol = 1
+                TargetCol = 1,
+                RewardedItem = ItemType.Bomb3x3,
+                TargetBoardLayout = target2,
+                PracticeInstruction = "★ ĐÃ NHẬN BOM 3X3! Nhấn giữ Bom ở cột phải, kéo ná bắn tung cụm gạch giữa bàn cờ!"
             });
 
             // ==========================================
-            // MÀN 4: THỬ ITEM ĐỔI GẠCH (RerollDock)
+            // MÀN 3: NỔ 2 HÀNG ĐÔI ĐỂ NHẬN ITEM ĐỔI GẠCH (REROLL)
+            // ==========================================
+            int[,] board3 = new int[8, 8];
+            for (int c = 0; c < 8; c++)
+            {
+                if (c < 3 || c > 4) { board3[3, c] = 3; board3[4, c] = 3; }
+            }
+
+            // Mục tiêu thực hành Pha 2: Bàn cờ sinh ra 1 hàng gạch có khe trống 1x2 ở giữa
+            int[,] target3 = new int[8, 8];
+            for (int c = 0; c < 8; c++)
+            {
+                if (c != 3 && c != 4) target3[4, c] = 3;
+            }
+
+            levels.Add(new TutorialStep
+            {
+                Title = "Màn 3/4: Tạo & Dùng Đổi Gạch",
+                Instruction = "Đặt khối 2x2 vào giữa để nổ 2 hàng đôi -> Nhận ITEM ĐỔI GẠCH!",
+                BoardLayout = board3,
+                DockPieceShape = new int[,] { { 1, 1 }, { 1, 1 } },
+                ColorIndex = 6,
+                TargetRow = 3,
+                TargetCol = 3,
+                RewardedItem = ItemType.RerollDock,
+                TargetBoardLayout = target3,
+                PracticeInstruction = "★ ĐÃ NHẬN ĐỔI GẠCH! Khay đang trống, hãy CLICK 'Đổi Gạch' ở cột phải để lấy gạch mới!"
+            });
+
+            // ==========================================
+            // MÀN 4: SIÊU COMBO 4 HÀNG -> NHẬN SẤM SÉT (LIGHTNING)
             // ==========================================
             int[,] board4 = new int[8, 8];
-            for (int c = 0; c < 8; c++)
-            {
-                if (c != 3 && c != 4) board4[4, c] = 2; // Hàng 4 chừa trống 2 ô nhưng khay chưa có gạch
-            }
+            for (int r = 2; r <= 5; r++)
+                for (int c = 0; c < 8; c++)
+                    if (c != 4) board4[r, c] = 2;
+
+            int[,] target4 = new int[8, 8];
+            target4[1, 1] = 1; target4[1, 6] = 1; target4[3, 3] = 1; target4[5, 5] = 1; target4[6, 2] = 1;
+
             levels.Add(new TutorialStep
             {
-                Title = "Màn 4/8: Item Đổi Gạch",
-                Instruction = "Khay đang trống! Hãy CLICK vào 'Đổi Gạch' ở cột phải để lấy gạch mới rồi đặt lên bàn cờ!",
+                Title = "Màn 4/4: Siêu Combo 4 Hàng & Sấm Sét",
+                Instruction = "Thả thanh 4x1 vào khe dọc để nổ 4 hàng cùng lúc -> Nhận SẤM SÉT!",
                 BoardLayout = board4,
-                DockPieceShape = null, // Khay trống để người chơi bấm Đổi Gạch
-                ColorIndex = 2,
-                RequiredItem = ItemType.RerollDock
-            });
-
-            // ==========================================
-            // MÀN 5: THỬ ITEM BOM 3x3 (Kéo ná cao su)
-            // ==========================================
-            int[,] board5 = new int[8, 8];
-            for (int r = 2; r <= 4; r++)
-                for (int c = 2; c <= 4; c++)
-                    board5[r, c] = 1; // Cụm gạch 3x3 giữa bàn cờ
-
-            levels.Add(new TutorialStep
-            {
-                Title = "Màn 5/8: Bắn Bom 3x3",
-                Instruction = "Nhấn giữ 'Bom 3x3', KÉO CĂNG NÁ SANG PHẢI để đường đạn vàng trỏ vào cụm gạch rồi thả tay!",
-                BoardLayout = board5,
-                DockPieceShape = null,
-                RequiredItem = ItemType.Bomb3x3
-            });
-
-            // ==========================================
-            // MÀN 6: THỬ ITEM TIA CHỮ THẬP
-            // ==========================================
-            int[,] board6 = new int[8, 8];
-            for (int i = 1; i < 7; i++)
-            {
-                board6[3, i] = 4; // Hàng 3
-                board6[i, 3] = 4; // Cột 3
-            }
-            levels.Add(new TutorialStep
-            {
-                Title = "Màn 6/8: Bắn Tia Chữ Thập",
-                Instruction = "Kéo căng ná bắn 'Tia Chữ Thập' trúng tâm chữ thập trên bàn cờ để quét ngang & dọc!",
-                BoardLayout = board6,
-                DockPieceShape = null,
-                RequiredItem = ItemType.CrossClear
-            });
-
-            // ==========================================
-            // MÀN 7: THỬ ITEM SẤM SÉT
-            // ==========================================
-            int[,] board7 = new int[8, 8];
-            board7[2, 2] = 1; board7[2, 5] = 1;
-            board7[3, 3] = 1; board7[3, 4] = 1;
-            board7[4, 3] = 1; board7[4, 4] = 1;
-            board7[5, 2] = 1; board7[5, 5] = 1;
-
-            levels.Add(new TutorialStep
-            {
-                Title = "Màn 7/8: Bắn Sấm Sét",
-                Instruction = "Kéo ná ngắm bắn 'Sấm Sét' trúng đúng 1 viên gạch ĐỎ để tiêu diệt toàn bộ gạch cùng màu!",
-                BoardLayout = board7,
-                DockPieceShape = null,
-                RequiredItem = ItemType.ColorLightning
-            });
-
-            // ==========================================
-            // MÀN 8: THỬ ITEM TRỌNG LỰC
-            // ==========================================
-            int[,] board8 = new int[8, 8];
-            for (int c = 0; c < 8; c++)
-            {
-                board8[c % 4, c] = 3; // 8 viên gạch nằm lơ lửng ở 8 cột, khi rơi xuống đáy sẽ nổ 1 hàng ngang!
-            }
-            levels.Add(new TutorialStep
-            {
-                Title = "Màn 8/8: Bắn Trọng Lực",
-                Instruction = "Kéo ná bắn 'Trọng Lực' vào bàn cờ để dồn các viên gạch lơ lửng rơi xuống đáy và nổ dòng!",
-                BoardLayout = board8,
-                DockPieceShape = null,
-                RequiredItem = ItemType.GravityFall
+                DockPieceShape = new int[,] { { 1 }, { 1 }, { 1 }, { 1 } },
+                ColorIndex = 4,
+                TargetRow = 2,
+                TargetCol = 4,
+                RewardedItem = ItemType.ColorLightning,
+                TargetBoardLayout = target4,
+                PracticeInstruction = "★ ĐÃ NHẬN SẤM SÉT! Bắn sét trúng 1 viên gạch ĐỎ để quét sạch toàn bộ gạch cùng màu!"
             });
         }
 
@@ -205,22 +185,22 @@ namespace BlockBlast.Module
 
         public bool NextLevel()
         {
-            CurrentLevelIndex++; // Chú ý chữ C viết hoa
+            CurrentLevelIndex++;
+            CurrentPhase = 1;
 
-            // Kiểm tra nếu đã vượt qua màn hướng dẫn cuối cùng
-            if (CurrentLevelIndex >= levels.Count) // Sửa tutorialLevels -> levels
+            if (CurrentLevelIndex >= levels.Count)
             {
-                IsTutorialActive = false; // Tắt hoàn toàn chế độ Tutorial
-                return false;             // Báo hiệu đã hết màn hướng dẫn
+                IsTutorialActive = false;
+                MarkTutorialCompleted(); // Đánh dấu hoàn thành vĩnh viễn
+                return false;
             }
-
-            return true; // Tiếp tục sang màn hướng dẫn tiếp theo
+            return true;
         }
 
-        // Hàm hỗ trợ reset tutorial từ đầu nếu người chơi muốn chơi lại
         public void ResetTutorial()
         {
             CurrentLevelIndex = 0;
+            CurrentPhase = 1;
             IsTutorialActive = true;
         }
     }

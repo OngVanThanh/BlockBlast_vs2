@@ -48,12 +48,6 @@
   <ItemGroup>
     <Compile Include="CreditsContent.cs" />
     <Compile Include="CreditsNarrative.cs" />
-    <Compile Include="FormCredits.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="FormCredits.Designer.cs">
-      <DependentUpon>FormCredits.cs</DependentUpon>
-    </Compile>
     <Compile Include="FormGamePlay.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -65,9 +59,7 @@
     <Compile Include="Module\BufferedPanel.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="Module\DragGhostWindow.cs">
-      <SubType>Form</SubType>
-    </Compile>
+    <Compile Include="Module\DragGhostOverlay.cs" />
     <Compile Include="Module\GameBoard.cs" />
     <Compile Include="Module\GameManager.cs" />
     <Compile Include="Module\Item.cs" />
@@ -76,9 +68,6 @@
     <Compile Include="Module\SoundManager.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <EmbeddedResource Include="FormCredits.resx">
-      <DependentUpon>FormCredits.cs</DependentUpon>
-    </EmbeddedResource>
     <EmbeddedResource Include="FormGamePlay.resx">
       <DependentUpon>FormGamePlay.cs</DependentUpon>
     </EmbeddedResource>

@@ -737,5 +737,276 @@ public static void ApplyModernTheme(Button[] buttons, Panel[] docks)
             if (scoreGained >= 200) return "COMBO x" + linesCleared + "!\n+" + scoreGained;
             return "+" + scoreGained;
         }
+        // Bật bộ đệm kép (Double-Buffering) cho toàn bộ Control và Panel con để chống giật chớp màn hình
+        public static void EnableDoubleBuffering(Control control)
+        {
+            if (control == null) return;
+
+            var prop = typeof(Control).GetProperty("DoubleBuffered",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            prop?.SetValue(control, true, null);
+
+            foreach (Control child in control.Controls)
+            {
+                EnableDoubleBuffering(child);
+            }
+        }
+        // ================================================================
+        //  CÁC HÀM RENDER ĐỒ HỌA GDI+ (CHUYỂN TỪ FORMGAMEPLAY SANG RENDERER)
+        // ================================================================
+
+        // 1. Vẽ icon bánh răng cưa cho nút Pause
+        public static void DrawGearIcon(Graphics g, float width, float height, Color backColor)
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            float cx = width / 2f;
+            float cy = height / 2f;
+            Color gearColor = Color.FromArgb(40, 48, 70);
+
+            using (SolidBrush brush = new SolidBrush(gearColor))
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    float angle = i * 45f;
+                    var state = g.Save();
+                    g.TranslateTransform(cx, cy);
+                    g.RotateTransform(angle);
+                    g.FillRectangle(brush, -3.5f, -13f, 7f, 26f);
+                    g.Restore(state);
+                }
+                g.FillEllipse(brush, cx - 10f, cy - 10f, 20f, 20f);
+                using (SolidBrush holeBrush = new SolidBrush(backColor))
+                {
+                    g.FillEllipse(holeBrush, cx - 4f, cy - 4f, 8f, 8f);
+                }
+            }
+        }
+
+        // 2. Vẽ tiêu đề lớn 3D và huy hiệu Kỷ lục trên Main Menu
+        public static void DrawMainMenuBackground(Graphics g, int w, int h, int highScore)
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            // Viền khung phát sáng
+            using (var path = CreateRoundedPath(new Rectangle(2, 2, w - 5, h - 5), 18))
+            using (Pen borderPen = new Pen(Color.FromArgb(110, 255, 159, 67), 2f))
+            {
+                g.DrawPath(borderPen, path);
+            }
+
+            // Tiêu đề "BLOCK BLAST" 3D
+            using (Font titleFont = new Font("Segoe UI", 25F, FontStyle.Bold))
+            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center })
+            {
+                g.DrawString("BLOCK BLAST", titleFont, new SolidBrush(Color.FromArgb(160, 0, 0, 0)), new PointF(w / 2f + 2, 22), sf);
+                using (var brush = new LinearGradientBrush(
+                    new Rectangle(0, 18, w, 45),
+                    Color.FromArgb(255, 230, 100),
+                    Color.FromArgb(255, 120, 40),
+                    LinearGradientMode.Vertical))
+                {
+                    g.DrawString("BLOCK BLAST", titleFont, brush, new PointF(w / 2f, 20), sf);
+                }
+            }
+
+            // Huy hiệu Kỷ lục
+            Rectangle badgeRect = new Rectangle((w - 230) / 2, 75, 230, 34);
+            using (var badgePath = CreateRoundedPath(badgeRect, 16))
+            using (SolidBrush badgeBg = new SolidBrush(Color.FromArgb(34, 40, 64)))
+            using (Pen badgeBorder = new Pen(Color.FromArgb(120, 255, 204, 77), 1.5f))
+            using (Font badgeFont = new Font("Segoe UI", 11F, FontStyle.Bold))
+            using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(255, 215, 0)))
+            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            {
+                g.FillPath(badgeBg, badgePath);
+                g.DrawPath(badgeBorder, badgePath);
+                g.DrawString($"★ KỶ LỤC CAO NHẤT: {highScore}", badgeFont, textBrush, badgeRect, sf);
+            }
+        }
+
+        // 3. Vẽ ô chứa Item ở cột phải (Nền, viền Neon và Icon)
+        public static void DrawItemSlot(Graphics g, int w, int h, Item item, bool isSelected)
+        {
+            if (item == null) return;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            Rectangle rect = new Rectangle(1, 1, w - 3, h - 3);
+            bool hasItem = item.Count > 0;
+
+            using (var path = CreateRoundedPath(rect, 10))
+            {
+                if (isSelected)
+                {
+                    using (SolidBrush bg = new SolidBrush(Color.FromArgb(42, 52, 78)))
+                        g.FillPath(bg, path);
+                    using (Pen border = new Pen(Color.FromArgb(255, 204, 77), 2.2f))
+                        g.DrawPath(border, path);
+                }
+                else if (hasItem)
+                {
+                    using (SolidBrush bg = new SolidBrush(Color.FromArgb(28, 34, 52)))
+                        g.FillPath(bg, path);
+                    using (Pen border = new Pen(Color.FromArgb(210, item.ThemeColor), 1.8f))
+                        g.DrawPath(border, path);
+                }
+                else
+                {
+                    using (SolidBrush bg = new SolidBrush(Color.FromArgb(20, 23, 34)))
+                        g.FillPath(bg, path);
+                    using (Pen border = new Pen(Color.FromArgb(50, 55, 72), 1f))
+                        g.DrawPath(border, path);
+                }
+            }
+
+            float iconCx = w / 2f;
+            float iconCy = h * 0.50f;
+            float iconRadius = Math.Min(w, h) * 0.19f;
+
+            if (hasItem)
+                DrawItemProjectileIcon(g, item.Type, iconCx, iconCy, iconRadius);
+            else
+                DrawDimmedItemIcon(g, item.Type, iconCx, iconCy, iconRadius);
+        }
+
+        // 4. Vẽ icon vật phẩm sắc nét rực rỡ
+        public static void DrawItemProjectileIcon(Graphics g, ItemType type, float cx, float cy, float radius)
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            if (type == ItemType.Bomb3x3)
+            {
+                using (SolidBrush bombBrush = new SolidBrush(Color.FromArgb(36, 40, 52)))
+                    g.FillEllipse(bombBrush, cx - radius, cy - radius + 2, radius * 2, radius * 2);
+                using (Pen border = new Pen(Color.FromArgb(20, 22, 28), 1.5f))
+                    g.DrawEllipse(border, cx - radius, cy - radius + 2, radius * 2, radius * 2);
+                using (SolidBrush highlight = new SolidBrush(Color.FromArgb(140, 255, 255, 255)))
+                    g.FillEllipse(highlight, cx - radius * 0.5f, cy - radius * 0.5f, radius * 0.45f, radius * 0.45f);
+                using (Pen fusePen = new Pen(Color.FromArgb(210, 160, 90), 2f))
+                    g.DrawArc(fusePen, cx - 4, cy - radius - 5, 8, 8, 200, 140);
+                using (SolidBrush spark = new SolidBrush(Color.FromArgb(255, 120, 30)))
+                    g.FillEllipse(spark, cx + 1, cy - radius - 7, 5, 5);
+            }
+            else if (type == ItemType.CrossClear)
+            {
+                float armLen = radius * 0.85f;
+                float armThick = radius * 0.45f;
+                using (SolidBrush brush = new SolidBrush(Color.FromArgb(255, 220, 60)))
+                {
+                    g.FillRectangle(brush, cx - armLen, cy - armThick / 2, armLen * 2, armThick);
+                    g.FillRectangle(brush, cx - armThick / 2, cy - armLen, armThick, armLen * 2);
+                }
+                using (Pen border = new Pen(Color.White, 1.2f))
+                {
+                    g.DrawRectangle(border, cx - armLen, cy - armThick / 2, armLen * 2, armThick);
+                    g.DrawRectangle(border, cx - armThick / 2, cy - armLen, armThick, armLen * 2);
+                }
+            }
+            else if (type == ItemType.ColorLightning)
+            {
+                PointF[] bolt = new PointF[]
+                {
+                    new PointF(cx + 1, cy - radius),
+                    new PointF(cx - radius * 0.75f, cy + 1),
+                    new PointF(cx - 1, cy + 1),
+                    new PointF(cx - 3, cy + radius),
+                    new PointF(cx + radius * 0.75f, cy - 1),
+                    new PointF(cx + 1, cy - 1)
+                };
+                using (SolidBrush boltBrush = new SolidBrush(Color.FromArgb(255, 230, 80)))
+                    g.FillPolygon(boltBrush, bolt);
+                using (Pen boltPen = new Pen(Color.White, 1.2f))
+                    g.DrawPolygon(boltPen, bolt);
+            }
+            else if (type == ItemType.GravityFall)
+            {
+                PointF[] arrow1 = new PointF[]
+                {
+                    new PointF(cx - radius * 0.7f, cy - radius * 0.4f),
+                    new PointF(cx + radius * 0.7f, cy - radius * 0.4f),
+                    new PointF(cx, cy + 2)
+                };
+                PointF[] arrow2 = new PointF[]
+                {
+                    new PointF(cx - radius * 0.7f, cy + 1),
+                    new PointF(cx + radius * 0.7f, cy + 1),
+                    new PointF(cx, cy + radius * 0.9f)
+                };
+                using (SolidBrush arrowBrush = new SolidBrush(Color.FromArgb(46, 204, 113)))
+                {
+                    g.FillPolygon(arrowBrush, arrow1);
+                    g.FillPolygon(arrowBrush, arrow2);
+                }
+                using (Pen arrowPen = new Pen(Color.White, 1.0f))
+                {
+                    g.DrawPolygon(arrowPen, arrow1);
+                    g.DrawPolygon(arrowPen, arrow2);
+                }
+            }
+            else
+            {
+                using (Pen arcPen = new Pen(Color.FromArgb(52, 152, 219), 3f))
+                    g.DrawArc(arcPen, cx - radius * 0.6f, cy - radius * 0.6f, radius * 1.2f, radius * 1.2f, 30, 280);
+            }
+        }
+
+        // 5. Vẽ icon chìm mờ khi vật phẩm có số lượng = 0
+        public static void DrawDimmedItemIcon(Graphics g, ItemType type, float cx, float cy, float radius)
+        {
+            using (SolidBrush dimBrush = new SolidBrush(Color.FromArgb(50, 56, 75)))
+            using (Pen dimPen = new Pen(Color.FromArgb(70, 78, 100), 1.2f))
+            {
+                if (type == ItemType.Bomb3x3)
+                {
+                    g.FillEllipse(dimBrush, cx - radius, cy - radius + 2, radius * 2, radius * 2);
+                    g.DrawEllipse(dimPen, cx - radius, cy - radius + 2, radius * 2, radius * 2);
+                }
+                else if (type == ItemType.CrossClear)
+                {
+                    float armLen = radius * 0.85f;
+                    float armThick = radius * 0.45f;
+                    g.FillRectangle(dimBrush, cx - armLen, cy - armThick / 2, armLen * 2, armThick);
+                    g.FillRectangle(dimBrush, cx - armThick / 2, cy - armLen, armThick, armLen * 2);
+                    g.DrawRectangle(dimPen, cx - armLen, cy - armThick / 2, armLen * 2, armThick);
+                    g.DrawRectangle(dimPen, cx - armThick / 2, cy - armLen, armThick, armLen * 2);
+                }
+                else if (type == ItemType.ColorLightning)
+                {
+                    PointF[] bolt = new PointF[]
+                    {
+                        new PointF(cx + 1, cy - radius),
+                        new PointF(cx - radius * 0.75f, cy + 1),
+                        new PointF(cx - 1, cy + 1),
+                        new PointF(cx - 3, cy + radius),
+                        new PointF(cx + radius * 0.75f, cy - 1),
+                        new PointF(cx + 1, cy - 1)
+                    };
+                    g.FillPolygon(dimBrush, bolt);
+                    g.DrawPolygon(dimPen, bolt);
+                }
+                else if (type == ItemType.GravityFall)
+                {
+                    PointF[] arrow1 = new PointF[]
+                    {
+                        new PointF(cx - radius * 0.7f, cy - radius * 0.4f),
+                        new PointF(cx + radius * 0.7f, cy - radius * 0.4f),
+                        new PointF(cx, cy + 2)
+                    };
+                    PointF[] arrow2 = new PointF[]
+                    {
+                        new PointF(cx - radius * 0.7f, cy + 1),
+                        new PointF(cx + radius * 0.7f, cy + 1),
+                        new PointF(cx, cy + radius * 0.9f)
+                    };
+                    g.FillPolygon(dimBrush, arrow1);
+                    g.FillPolygon(dimBrush, arrow2);
+                    g.DrawPolygon(dimPen, arrow1);
+                    g.DrawPolygon(dimPen, arrow2);
+                }
+                else
+                {
+                    g.DrawArc(dimPen, cx - radius * 0.7f, cy - radius * 0.7f, radius * 1.4f, radius * 1.4f, 40, 270);
+                }
+            }
+        }
     }
 }
